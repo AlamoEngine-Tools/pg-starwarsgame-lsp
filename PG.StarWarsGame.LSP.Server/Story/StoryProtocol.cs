@@ -135,7 +135,10 @@ public sealed record GetStoryGraphParams(
     // Which scope to show: null or empty is the galactic story with each battle as one portal;
     // a battle key (from getStoryPlots' battles) is that battle's own graph with the galaxy as
     // portals. An older client sends none and gets the galactic story.
-    string? Scope = null) : IRequest<GetStoryGraphResult>;
+    string? Scope = null,
+    // How NameFilter is read: "text", "wildcard" or "regex" (see StoryNamePattern). Null is text,
+    // which is what the filter did before it had modes.
+    string? NameFilterMode = null) : IRequest<GetStoryGraphResult>;
 
 /// <param name="Branches">
 ///     Every branch name in the campaign, INDEPENDENT of the filters that produced
@@ -218,7 +221,11 @@ public sealed record StoryTypeSchemaDto(
     // `untested` boolean in schema 2.0.0: the editor has to tell a type nobody has verified from
     // one the engine ignores outright, and a boolean could only ever say the first.
     IReadOnlyList<StoryNoteDto> Notes,
-    IReadOnlyList<StoryParamSchemaDto> Params);
+    IReadOnlyList<StoryParamSchemaDto> Params,
+    // The type's display name, in one to four words: what a palette tile shows where the reader
+    // has asked for names and not identifiers. Null for a type the schema has not named, which the
+    // client shows by its technical name.
+    string? Label = null);
 
 /// <param name="Kind">A <c>SchemaNoteKind</c> name. Unknown to an older client, which ignores it.</param>
 /// <param name="Text">The note in the session's locale, already resolved, or null when it has none.</param>

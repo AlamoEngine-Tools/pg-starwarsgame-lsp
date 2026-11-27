@@ -27,8 +27,13 @@ import {
 import { type PreviewViewport } from "./viewport";
 import { setRow } from "./visibility";
 import { type DefinedLevels } from "./levels";
-import { countTreeNodes, searchIsOpen, treeFilterSummary } from "./treeSearch";
+import {
+    countTreeNodes,
+    treeFilterSummary,
+    treeIsFiltered,
+} from "./treeSearch";
 import { modelTouched } from "./previewMode";
+import { compileMatcher, type SearchMode } from "../shared/searchPattern";
 
 /** What useModelTree reads from the rest of the preview. */
 export interface ModelTreeInputs {
@@ -68,6 +73,9 @@ export function useModelTree({
     const foldedRef = useRef(false);
     const [boneFilter, setBoneFilter] = useState("");
 
+    /** How the pattern is read: plain text, with wildcards, or as a regular expression. */
+    const [boneFilterMode, setBoneFilterMode] = useState<SearchMode>("text");
+
     /** Which kinds the tree shows. All three to begin with. */
     const [kinds, setKinds] = useState<ReadonlySet<TreeKind>>(
         new Set<TreeKind>(TREE_KINDS),
@@ -92,15 +100,32 @@ export function useModelTree({
     );
 
     const wholeTree = buildTree(treeItems);
-    const filteredTree = filterTree(wholeTree, { text: boneFilter, kinds });
+    const filteredTree = filterTree(wholeTree, {
+        text: boneFilter,
+        mode: boneFilterMode,
+        kinds,
+    });
     const treeRows = visibleTreeRows(filteredTree, collapsed);
 
     /* What the tree would show with no filter at all, which is the height it is held at. Folding a
        branch still changes it - that is the reader asking for less tree - but filtering cannot. */
     const unfilteredRowCount = visibleTreeRows(wholeTree, collapsed).length;
 
-    /* Showing, which is not the same as pressed: a pattern keeps its own box open. */
-    const searchOpen = searchIsOpen(searchPressed, boneFilter);
+    /* The field shows while the magnifier is pressed, and for no other reason: closing it leaves
+       the pattern in force, and the plate's filter icon is what says a filter is set. */
+    const searchOpen = searchPressed;
+
+    /* A pattern, or a kind switched off. Either turns the plate's filter icon into the reset. */
+    const filtered = treeIsFiltered(boneFilter, kinds.size);
+
+    /* Why the pattern will not compile, for the field. Only a regular expression can fail. */
+    const filterError = compileMatcher(boneFilter.trim(), boneFilterMode).error;
+
+    /** The plate's reset: no pattern, every kind back on. How the pattern is read stays. */
+    const resetFilter = (): void => {
+        setBoneFilter("");
+        setKinds(new Set<TreeKind>(TREE_KINDS));
+    };
 
     /* What the header says when the tree is showing less than the model has. The count alone
        cannot carry it - "40" over a Star Destroyer reads as a small model, and once the search
@@ -218,12 +243,17 @@ export function useModelTree({
         foldedRef,
         boneFilter,
         setBoneFilter,
+        boneFilterMode,
+        setBoneFilterMode,
         kinds,
         setKinds,
         shownSystems,
         treeRows,
         unfilteredRowCount,
         searchOpen,
+        filtered,
+        filterError,
+        resetFilter,
         filterSummary,
         touched,
         resetModel,

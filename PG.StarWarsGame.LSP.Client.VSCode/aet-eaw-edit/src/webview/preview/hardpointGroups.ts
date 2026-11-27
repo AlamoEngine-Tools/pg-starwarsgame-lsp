@@ -13,6 +13,7 @@
 import * as l10n from "@vscode/l10n";
 
 import { type HardpointCard } from "./hardpointCards";
+import { compileMatcher, type SearchMode } from "../shared/searchPattern";
 
 /** One heading and the cards under it. */
 export interface HardpointGroup {
@@ -38,13 +39,13 @@ export interface HardpointGroup {
 export function groupHardpoints(
     cards: readonly HardpointCard[],
     filter: string,
+    mode: SearchMode = "text",
 ): HardpointGroup[] {
-    const wanted = filter.trim().toLowerCase();
+    const answers = compileMatcher(filter.trim(), mode).test;
 
+    // On the type and on the name. An empty pattern answers everything.
     const matches = (card: HardpointCard): boolean =>
-        wanted === "" ||
-        (card.type ?? "").toLowerCase().includes(wanted) ||
-        card.id.toLowerCase().includes(wanted);
+        answers(card.type ?? "") || answers(card.id);
 
     const groups = new Map<string, HardpointGroup>();
 

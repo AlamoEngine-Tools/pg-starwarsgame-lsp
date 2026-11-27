@@ -270,13 +270,32 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
             // measured at 750ms this still caught an intermediate publish about once every three
             // full-suite runs, where a dozen servers share the machine and a re-index can stall
             // longer than that mid-edit.
+            //
+            // And it has to start once the server has taken the edit in, not when the edit is
+            // sent. A publish from before the rename-back was processed can be followed by more
+            // than the 2s of silence while the server works through the edit's didChanges - the
+            // wait then returned that publish, and it still named the renamed symbol. So the wait
+            // listens from before the edit and is handed a barrier: the answer to a request sent
+            // after the edit, which the server gives only once it has handled every notification
+            // sent before it.
+            var editProcessed = new TaskCompletionSource();
             var diagBackTask = _fixture.WaitForSettledDiagnosticsAsync(
-                corvettesUri, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30));
+                corvettesUri, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30), editProcessed.Task);
             await ApplyWorkspaceEditAsync(editBack, inMemory, versions);
             renamed = false;
 
+            using var cts5 = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await _fixture.Client.PrepareRename(
+                new PrepareRenameParams
+                {
+                    TextDocument = new TextDocumentIdentifier { Uri = entryUri },
+                    Position = new Position(backLine, backCol)
+                }, cts5.Token);
+            editProcessed.SetResult();
+
             var diagsBack = await diagBackTask;
-            Assert.NotNull(diagsBack);
+            Assert.True(diagsBack is not null,
+                "No diagnostics were published for corvettes.xml after the server had processed the rename-back.");
             var backMessages = diagsBack.Diagnostics.Select(d => d.Message.Text()).ToList();
 
             Assert.False(

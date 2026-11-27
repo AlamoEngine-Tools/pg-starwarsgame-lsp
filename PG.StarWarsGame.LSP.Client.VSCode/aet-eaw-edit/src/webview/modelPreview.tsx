@@ -5,7 +5,7 @@
 // graph, the localisation editors and the encyclopedia card already use.
 //
 // The dock's three levels have fixed MEANINGS, and a control goes in the one matching what it IS:
-// the header reports state about the document (the subject and the severity tag), the content is
+// the header reports state about the document (the subject and the lens dial), the content is
 // this editor's library (the model's own stats and hardpoints), and the foot holds EVERY view
 // control - camera angle, grid, which animation. Camera buttons floating over the canvas were the
 // obvious place to write them and the wrong place to put them.
@@ -113,7 +113,13 @@ import { shadowTintReach, standInBlock } from "./preview/shadowVolumePass";
 import { RightDock } from "./shared/RightDock";
 
 import { initPanelLayout } from "./shared/panelLayoutBridge";
+import * as l10n from "@vscode/l10n";
 import { vscodeApi } from "./shared/vscodeApi";
+import { IconButton } from "./shared/Button";
+import { type DialAction } from "./shared/RotaryModeSwitch";
+import { resetScene } from "./preview/sceneReset";
+import { PageToolbar } from "./shared/PageToolbar";
+import { SeverityTag } from "./shared/SeverityTag";
 
 // Reads the dock and drawer sizes the host seeded into the page, and reports
 // every drag back to it. Must run before anything measures itself.
@@ -509,8 +515,15 @@ function ModelPreview(): React.JSX.Element {
         treeItems,
         viewportRef,
     });
-    const { collapsed, setCollapsed, foldedRef, boneFilter, setBoneFilter } =
-        tree;
+    const {
+        collapsed,
+        setCollapsed,
+        foldedRef,
+        boneFilter,
+        setBoneFilter,
+        boneFilterMode,
+        setBoneFilterMode,
+    } = tree;
 
     /**
      * Game rendering's stand-in shadow, for a model without a shadow mesh.
@@ -1165,6 +1178,7 @@ function ModelPreview(): React.JSX.Element {
         setAttackerPresets,
         setAttackerProjectile,
         setBoneFilter,
+        setBoneFilterMode,
         setCollapsed,
         setCustomColour,
         setDestroyed,
@@ -1242,6 +1256,7 @@ function ModelPreview(): React.JSX.Element {
         attacker,
         attackerPresets,
         boneFilter,
+        boneFilterMode,
         collapsed,
         customColour,
         destroyed,
@@ -1376,6 +1391,71 @@ function ModelPreview(): React.JSX.Element {
     const handoff =
         scene === null ? null : handoffFor(scene.kind, scene.sourceFile);
 
+    // The subject back the way it loaded, in place. What the reader set up to look at it - camera,
+    // overlays, lens, attacker, the tree's filter and folds - stays; see sceneReset.ts.
+    const resetSceneNow = (): void =>
+        resetScene({
+            showRestPose: () => player.setAnimation(null),
+            resetModel: tree.resetModel,
+            forgetDetailPick: () => {
+                lodPickedRef.current = false;
+            },
+            resetTurrets: () => {
+                viewportRef.current?.resetAllTurretAims();
+                combat.setSweeping(new Set());
+            },
+            repair: () => {
+                combat.repairTarget(false);
+                combat.destroyAll(false, false);
+            },
+            resetUnitState: () => {
+                combat.setSpeed(1);
+                combat.setIonStunned(false);
+                combat.setEnginesDisabled(false);
+            },
+            clearAbilities: () => setActiveAbilities(new Set()),
+            clearSelection,
+            restartParticles: particleTransport.restart,
+            clearDamageLog: () => combat.setDamageLog([]),
+        });
+
+    // The reset is in the same slot in every lens; Gameplay adds its two at the other end.
+    const dialActions: DialAction[] = [
+        {
+            id: "sceneReset",
+            icon: "sceneReset",
+            title: l10n.t(
+                "Reset the scene - put the subject back as it loaded",
+            ),
+            slot: "start",
+            onPress: resetSceneNow,
+        },
+        ...(mode === "gameplay"
+            ? ([
+                  {
+                      id: "destroyAll",
+                      icon: "effects",
+                      title: l10n.t("Destroy all hardpoints"),
+                      slot: "end",
+                      disabled: !combat.cards.some((c) => c.isDestroyable),
+                      disabledReason: l10n.t(
+                          "No hardpoint on this model can be destroyed",
+                      ),
+                      onPress: () => combat.destroyAll(true),
+                  },
+                  {
+                      id: "repairAll",
+                      icon: "repair",
+                      title: l10n.t("Repair all hardpoints"),
+                      slot: "end-2",
+                      disabled: combat.destroyed.size === 0,
+                      disabledReason: l10n.t("Nothing is destroyed"),
+                      onPress: () => combat.destroyAll(false),
+                  },
+              ] satisfies DialAction[])
+            : []),
+    ];
+
     const pills = useOverlayPills({
         emitters,
         fireArcs,
@@ -1402,6 +1482,39 @@ function ModelPreview(): React.JSX.Element {
 
     return (
         <Shell>
+            <PageToolbar
+                actions={
+                    // One tool per scene - see handoffFor. A particle file's is the Particle Editor.
+                    handoff !== null && (
+                        <IconButton
+                            icon={handoff.icon}
+                            className="as-action"
+                            title={handoff.title}
+                            disabled={handoff.disabledReason !== undefined}
+                            disabledReason={handoff.disabledReason ?? ""}
+                            onClick={() =>
+                                post({
+                                    type: "openExternal",
+                                    tool: handoff.tool,
+                                })
+                            }
+                        />
+                    )
+                }
+                verdict={
+                    <SeverityTag
+                        severity={severity}
+                        count={notices.length}
+                        expanded={problemsOpen}
+                        disabled={notices.length === 0}
+                        disabledReason={l10n.t(
+                            "Nothing to report about this model",
+                        )}
+                        title={problemsTitle}
+                        onClick={() => setProblemsOpen((open) => !open)}
+                    />
+                }
+            />
             <div className="body">
                 <div className="stage-column">
                     <div className="viewport">
@@ -1446,6 +1559,8 @@ function ModelPreview(): React.JSX.Element {
                             setWorldOpen={setWorldOpen}
                             viewportRef={viewportRef}
                             worldOpen={worldOpen}
+                            worldPillRef={flyouts.worldPillRef}
+                            cameraPillRef={flyouts.cameraPillRef}
                         />
 
                         {worldOpen && (
@@ -1473,7 +1588,7 @@ function ModelPreview(): React.JSX.Element {
                         )}
 
                         {/* Where you look FROM. The mirror of the scene panel opposite, down to the
-                            corner it hangs in and the reset in its head - the two are the same kind
+                            pill it opens at and the reset in its head - the two are the same kind
                             of thing about different halves of the picture. */}
                         {cameraOpen && (
                             <CameraFlyout
@@ -1535,6 +1650,7 @@ function ModelPreview(): React.JSX.Element {
                             middle={
                                 <AbilityCommandBar
                                     abilitiesOpen={abilitiesOpen}
+                                    abilitiesPillRef={flyouts.abilitiesPillRef}
                                     abilityState={abilityState}
                                     combat={combat}
                                     mode={mode}
@@ -1550,6 +1666,7 @@ function ModelPreview(): React.JSX.Element {
                                     />
                                     <AttackControls
                                         attackOpen={attackOpen}
+                                        attackPillRef={flyouts.attackPillRef}
                                         combat={combat}
                                         mode={mode}
                                         scene={scene}
@@ -1566,6 +1683,7 @@ function ModelPreview(): React.JSX.Element {
                             fact. */}
                         {abilitiesOpen && (
                             <AbilitiesFlyout
+                                abilitiesPillRef={flyouts.abilitiesPillRef}
                                 abilitiesRef={abilitiesRef}
                                 abilityState={abilityState}
                                 infoAbility={infoAbility}
@@ -1616,18 +1734,13 @@ function ModelPreview(): React.JSX.Element {
                     header={
                         <DockHeader
                             abilityState={abilityState}
+                            dialActions={dialActions}
                             flyouts={flyouts}
-                            handoff={handoff}
                             mode={mode}
                             modelDetail={modelDetail}
-                            notices={notices}
                             player={player}
-                            problemsOpen={problemsOpen}
-                            problemsTitle={problemsTitle}
                             scene={scene}
                             setMode={setMode}
-                            setProblemsOpen={setProblemsOpen}
-                            severity={severity}
                             standInDrawn={standInDrawn}
                             stats={stats}
                         />

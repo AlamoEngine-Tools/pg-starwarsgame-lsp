@@ -713,3 +713,42 @@ describe("toggleSelected", () => {
         assert.deepEqual([...before], ["a"]);
     });
 });
+
+describe("filterTree with a pattern mode", () => {
+    const roots = buildTree(ITEMS);
+
+    /** The rows that answered the pattern themselves, without the ancestors kept to reach them. */
+    const found = (
+        text: string,
+        mode?: "text" | "wildcard" | "regex",
+    ): string[] =>
+        visibleTreeRows(
+            filterTree(roots, { text, kinds: ALL, mode }),
+            new Set(),
+        )
+            .filter((row) => !row.node.scaffold)
+            .map((row) => row.node.name);
+
+    it("reads * and ? as wildcards in wildcard mode", () => {
+        assert.deepEqual(found("p_sm?ke", "wildcard"), ["p_smoke"]);
+        assert.deepEqual(found("bantha*#0", "wildcard"), [
+            "Bantha#0",
+            "Bantha_Skirt#0",
+        ]);
+    });
+
+    it("reads the pattern as a regular expression in regex mode, without case", () => {
+        assert.deepEqual(found("^head#\\d$", "regex"), ["Head#0"]);
+    });
+
+    /** Half-typed most of the time it is being used: it matches nothing, and does not throw. */
+    it("shows nothing for a regular expression that does not compile", () => {
+        assert.deepEqual(found("(", "regex"), []);
+    });
+
+    it("takes the same characters literally in plain text, which is the mode when none is given", () => {
+        assert.deepEqual(found("p_sm?ke", "text"), []);
+        assert.deepEqual(found("p_sm?ke"), []);
+        assert.deepEqual(found("p_smoke"), ["p_smoke"]);
+    });
+});

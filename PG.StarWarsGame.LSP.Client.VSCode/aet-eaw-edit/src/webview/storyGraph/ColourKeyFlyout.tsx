@@ -12,9 +12,10 @@
 // that is what cost the graph its frame rate before. A key costs nothing while it is closed.
 //
 // The shell is the model preview's stage flyout (`StageFlyout`), on purpose: the same panel,
-// opened the same way, from the same kind of corner plate.
+// opened the same way, at the pill on the same kind of plate.
 
 import * as l10n from "@vscode/l10n";
+import type { RefObject } from "react";
 import { DockSection } from "../shared/DockSection";
 import { StageFlyout } from "../shared/Stage";
 
@@ -26,19 +27,21 @@ import {
 } from "./palette";
 
 export interface ColourKeyFlyoutProps {
+    /** The pill that opens the key, which is where it opens. */
+    anchor: RefObject<HTMLElement | null>;
     branches: readonly BranchKeyEntry[];
     onClose: () => void;
 }
 
 export function ColourKeyFlyout({
+    anchor,
     branches,
     onClose,
 }: ColourKeyFlyoutProps): React.JSX.Element {
     return (
         <StageFlyout
             title={l10n.t("Colour key")}
-            at="right"
-            fromBottom
+            anchor={anchor}
             className="colour-key"
             onClose={onClose}
         >

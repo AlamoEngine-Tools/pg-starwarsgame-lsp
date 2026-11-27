@@ -48,7 +48,8 @@ public sealed class PreviewStoryGraphHandler(
         if (request.Commands.Count == 0)
             return Task.FromResult(StoryGraphProjection.Project(
                 baseModel, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
-                request.PlotState, request.ReachableDirection, request.Scope));
+                request.PlotState, request.ReachableDirection, request.Scope,
+                nameFilterMode: request.NameFilterMode));
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService, NullLogger.Instance,
@@ -74,7 +75,8 @@ public sealed class PreviewStoryGraphHandler(
 
         return Task.FromResult(StoryGraphProjection.Project(
             previewModel, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
-            request.PlotState, request.ReachableDirection, request.Scope));
+            request.PlotState, request.ReachableDirection, request.Scope,
+            nameFilterMode: request.NameFilterMode));
 
         (string Uri, string Text)? ReadThread(string xmlRelativePath)
         {

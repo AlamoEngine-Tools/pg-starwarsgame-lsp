@@ -18,7 +18,7 @@ describe("PRV-14", () => {
             const filter = await browser.$('button[title="Filter the tree by name"]');
             await filter.waitForClickable({ timeout: 120_000 });
             await filter.click();
-            await (await browser.$("input.tree-filter")).setValue("Target");
+            await (await browser.$("input.search-plate-field")).setValue("Target");
 
             let names: string[] = [];
             await browser.waitUntil(

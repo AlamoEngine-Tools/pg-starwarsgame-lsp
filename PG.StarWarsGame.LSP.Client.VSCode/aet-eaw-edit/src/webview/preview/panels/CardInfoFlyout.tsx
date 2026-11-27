@@ -5,9 +5,9 @@
 
 import type { Dispatch, SetStateAction, RefObject } from "react";
 import type { CombatLens } from "../useCombatLens";
-import * as l10n from "@vscode/l10n";
 import { Fragment } from "react";
-import { IconButton } from "../../shared/Button";
+import { DetailsFlyout } from "../../shared/DetailsFlyout";
+import type { AnchorPlacement } from "../../shared/flyoutAnchor";
 import {
     hardpointFacts,
     unitWeaponFacts,
@@ -15,7 +15,7 @@ import {
 } from "../hardpointCards";
 
 export interface CardInfoFlyoutProps {
-    cardInfoAt: { left: number; top: number } | null;
+    cardInfoAt: AnchorPlacement | null;
     cardInfoRef: RefObject<HTMLDivElement | null>;
     combat: CombatLens;
     infoCard: string;
@@ -30,68 +30,52 @@ export function CardInfoFlyout({
     setInfoCard,
 }: CardInfoFlyoutProps): React.JSX.Element {
     return (
-        <div
-            className="details-flyout"
-            role="dialog"
+        <DetailsFlyout
+            title={infoCard}
+            at={cardInfoAt}
             ref={cardInfoRef}
-            style={
-                cardInfoAt === null
-                    ? { visibility: "hidden" }
-                    : { left: cardInfoAt.left, top: cardInfoAt.top }
-            }
+            onClose={() => setInfoCard(null)}
         >
-            <div className="details-head">
-                <span className="details-title">{infoCard}</span>
-                <IconButton
-                    icon="close"
-                    title={l10n.t("Close")}
-                    onClick={() => setInfoCard(null)}
-                />
-            </div>
-            <div className="details-body">
-                {(() => {
-                    const card = combat.cards.find(
-                        (entry) => entry.id === infoCard,
-                    );
+            {(() => {
+                const card = combat.cards.find(
+                    (entry) => entry.id === infoCard,
+                );
 
-                    // A unit weapon's card carries the same button, and the same
-                    // measurements sit behind it - it simply has no hardpoint half.
-                    const loose =
-                        card === undefined
-                            ? combat.looseWeapons.find(
-                                  (row) => row.id === infoCard,
-                              )
-                            : undefined;
+                // A unit weapon's card carries the same button, and the same
+                // measurements sit behind it - it simply has no hardpoint half.
+                const loose =
+                    card === undefined
+                        ? combat.looseWeapons.find((row) => row.id === infoCard)
+                        : undefined;
 
-                    const facts =
-                        card !== undefined
-                            ? hardpointFacts(card)
-                            : loose === undefined
-                              ? []
-                              : unitWeaponFacts(loose);
+                const facts =
+                    card !== undefined
+                        ? hardpointFacts(card)
+                        : loose === undefined
+                          ? []
+                          : unitWeaponFacts(loose);
 
-                    const weapon = card?.weapon ?? loose ?? null;
+                const weapon = card?.weapon ?? loose ?? null;
 
-                    if (card === undefined && loose === undefined) {
-                        return null;
-                    }
+                if (card === undefined && loose === undefined) {
+                    return null;
+                }
 
-                    return (
-                        <dl className="card-info">
-                            {facts.map((fact) => (
-                                <dd key={fact}>{fact}</dd>
+                return (
+                    <dl className="card-info">
+                        {facts.map((fact) => (
+                            <dd key={fact}>{fact}</dd>
+                        ))}
+                        {weapon !== null &&
+                            weaponFacts(weapon).map(([label, value]) => (
+                                <Fragment key={label}>
+                                    <dt>{label}</dt>
+                                    <dd>{value}</dd>
+                                </Fragment>
                             ))}
-                            {weapon !== null &&
-                                weaponFacts(weapon).map(([label, value]) => (
-                                    <Fragment key={label}>
-                                        <dt>{label}</dt>
-                                        <dd>{value}</dd>
-                                    </Fragment>
-                                ))}
-                        </dl>
-                    );
-                })()}
-            </div>
-        </div>
+                    </dl>
+                );
+            })()}
+        </DetailsFlyout>
     );
 }

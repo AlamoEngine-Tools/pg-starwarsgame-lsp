@@ -172,25 +172,9 @@ ${tokensCss}
     }
 
     /* ── Search ────────────────────────────────────────────────────────── */
-    /* The mode toggles sit inside the box, the way an editor's find widget puts them - that buys
-       back a whole row, which is what made this corner feel cramped. */
     .dock-search { display: flex; flex-direction: column; gap: var(--space-6); }
     .search-field { position: relative; display: flex; align-items: center; }
     .search-field input[type=text] { width: 100%; padding: var(--space-4) var(--space-8); }
-    /* Room for the three toggles, which overlay the trailing edge. Only where they exist - the
-       graph editor's filters have no modes and must not carry a gap for buttons it never draws. */
-    .search-field.with-modes input[type=text] { padding-right: var(--search-modes-inset); }
-    .search-field .mode-group { position: absolute; right: 3px; display: flex; gap: var(--space-1); }
-    /* The three modes are a one-of-N choice and say so - but inside the box they are a compact
-       cluster over the trailing edge, not the full-width joined row a settings pane gets. So the
-       group keeps its own width and its segments keep the size they had as separate toggles. */
-    .search-field .mode-group .mode-selector { width: auto; }
-    .search-field .mode-group .mode-selector button {
-        flex: 0 0 auto;
-        min-width: 22px;
-        padding: var(--space-2) var(--space-4);
-    }
-    .search-field .mode-group .codicon { font-size: var(--icon-size-14); }
 
     /* A control and its label are a pair and sit close; the gap BETWEEN fields is what the
        section body sets, and it is larger. Three pixels here had the label almost touching the
@@ -383,6 +367,35 @@ ${tokensCss}
        for toolbars, where a row of borderless glyphs reads as a toolbar; standing alone in a
        settings pane the same button reads as an ornament, because nothing says it can be pressed. */
     .btn.compact { padding: var(--space-4) var(--space-8); }
+
+    /* ── The page toolbar ──────────────────────────────────────────────── */
+    /* Across the top of the page, above the canvas and the dock alike. It never shrinks: the page
+       under it gives way, or a narrow window would squeeze the one row every action is on. A row
+       too narrow for both ends wraps the right end under the left one. */
+    .page-toolbar {
+        flex-shrink: 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-4) var(--space-12);
+        padding: var(--space-6) var(--space-12);
+        background: var(--colour-editor-ground);
+        border-bottom: var(--space-1) solid var(--colour-line);
+        font-family: var(--font-family-ui);
+        font-size: var(--font-size-body);
+    }
+    .page-toolbar-start,
+    .page-toolbar-end {
+        display: flex;
+        align-items: center;
+        gap: var(--space-8);
+        min-width: 0;
+    }
+    .page-toolbar-end { gap: var(--space-4); margin-left: auto; }
+
+    .page-toolbar .icon-btn { font-size: var(--icon-size-16); }
+    .page-toolbar .icon-btn .codicon { font-size: var(--icon-size-16); }
 
     /* ── Dialogs ───────────────────────────────────────────────────────── */
     .modal-backdrop {
@@ -1072,6 +1085,20 @@ export const dockHeaderCss = `
         min-height: 34px;
     }
     .dock-header.with-dial { min-height: 78px; }
+    /* A header with nothing to report takes no band of the dock. */
+    .dock-header:empty { display: none; }
+
+    /* The fold of a header that holds the dial: in its top-right corner, and still there once the
+       header is folded, where it is all that is left of it. Three classes, so the header's own
+       icon sizing further down does not make a corner mark as large as a control. */
+    .dock-header .icon-btn.header-fold {
+        position: absolute;
+        top: var(--space-2);
+        right: var(--space-2);
+        min-width: 0;
+        padding: var(--space-2);
+    }
+    .dock-header.with-dial.folded { min-height: 20px; padding: 0; }
     .dock-header .header-left { position: absolute; left: 8px; }
     .dock-header .header-right { position: absolute; right: 8px; }
 
@@ -1333,6 +1360,27 @@ export const dockOverviewCss = `
         overflow-y: auto;
     }
     .dock-overview > input[type=text] { width: 100%; }
+
+    /* A zoom in a foot - see ZoomSlider. The track takes the row; the readout keeps a width of its
+       own, so the track does not change length as the number under it grows a digit. */
+    .zoom-slider {
+        display: flex;
+        align-items: center;
+        gap: var(--space-8);
+    }
+    .zoom-slider input[type=range] {
+        flex: 1;
+        min-width: 0;
+        height: 18px;
+        margin: 0;
+    }
+    .zoom-slider .zoom-readout {
+        flex: 0 0 auto;
+        min-width: 5ch;
+        text-align: right;
+        font-size: var(--font-size-smaller);
+        font-variant-numeric: tabular-nums;
+    }
 `;
 
 /**
@@ -1431,6 +1479,32 @@ export const rotarySwitchCss = `
             0 0 0 2px var(--colour-editor-ground),
             0 0 7px 1px var(--colour-focus);
     }
+
+    /* A mode-wide action: beside the centre and on its level, where the arc above holds the modes.
+       Bordered, because it fires and returns where a position latches. Each slot is a fixed place,
+       so an action is where it was in the last mode. */
+    .rotary-action {
+        position: absolute;
+        left: 50%; top: 70%;
+        width: 22px; height: 22px;
+        padding: 0;
+        display: flex; align-items: center; justify-content: center;
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-radius: var(--radius-round);
+        background: var(--colour-action-2);
+        color: var(--colour-action-2-ink);
+        line-height: 1;
+        cursor: pointer;
+    }
+    .rotary-action svg { width: var(--icon-size-11); height: var(--icon-size-11); display: block; }
+    .rotary-action:hover:not(:disabled) {
+        background: var(--colour-action-2-hover);
+        border-color: var(--colour-focus);
+    }
+    .rotary-action:disabled { opacity: 0.35; cursor: default; }
+    .rotary-action.at-start { transform: translate(-50%, -50%) translate(-44px, 12px); }
+    .rotary-action.at-end { transform: translate(-50%, -50%) translate(44px, 12px); }
+    .rotary-action.at-end-2 { transform: translate(-50%, -50%) translate(70px, 12px); }
 `;
 
 /**
@@ -1439,7 +1513,7 @@ export const rotarySwitchCss = `
  * Shared because the story graph's colour key button (#128) sits on the same plate the preview's
  * corners use. The host places it; this is only what it looks like.
  */
-export const stageChromeCss = `
+const stagePlateCss = `
     /* One shared plate so every corner reads as the same kind of thing. Semi-transparent, since
        a solid panel over a viewport looks like a hole in it. */
     .stage-chrome {
@@ -1466,6 +1540,14 @@ export const stageChromeCss = `
         border-radius: var(--radius-3);
     }
 
+`;
+
+/**
+ * The pill a list is picked from - see PillSelect. A block of its own since the search plate took
+ * the pill for its dropdown filters: a page with a search plate and no stage needs these rules
+ * without the stage's.
+ */
+export const pillSelectCss = `
     /* One pick out of a list, on a plate - see PillSelect. The glyph of what is picked, the value,
        and the mark of a list behind a divider: the divider and the mark are what tell it from a
        toggle, which is a pill too, and its resting border from a toggle that is off.
@@ -1548,6 +1630,12 @@ export const stageChromeCss = `
         cursor: default;
     }
 `;
+
+/**
+ * The stage's plates and the pill select that sits on them, which is how every page with a stage
+ * takes the two.
+ */
+export const stageChromeCss = stagePlateCss + pillSelectCss;
 
 /**
  * The stage's edges: a row of three slots along the top and along the bottom, the plates sitting
@@ -1745,25 +1833,26 @@ export const comboboxCss = `
 `;
 
 /**
- * The panel a stage-corner button opens beside itself.
+ * The panel a stage pill opens beside itself.
  *
  * Shared for the same reason as the plate: the story graph's colour key is this flyout, not a
  * lookalike. The preview's "less cramped" rules for fields inside a flyout stay in its own sheet -
  * they are about the preview's settings, not about what a flyout is.
  */
 export const stageFlyoutCss = `
-    /* One box, several corners. Which side a panel is on says which button it belongs to before a
-       word of it is read. */
+    /* One box, wherever its pill is. Where it sits is not here: it is measured against the pill
+       that opened it and set on the box itself (placeStageFlyout), because a pill is not in a
+       corner a stylesheet could name. */
     .stage-flyout {
         position: absolute;
-        top: 40px;
         z-index: 3;
         /* Wide enough that a two-line checkbox label is the exception rather than the rule. At 270
            nearly every note and half the labels wrapped, which is what made the panel read as
            cramped even before the sections went in. */
         width: 304px;
-        /* Never past the bottom of the stage; the body scrolls inside instead. */
-        max-height: calc(100% - 56px);
+        /* Never past the stage; the body scrolls inside instead. The placement sets the real cap,
+           which is the room between the pill and the far edge. */
+        max-height: calc(100% - 16px);
         display: flex;
         flex-direction: column;
         border: var(--space-1) solid var(--colour-line-strong);
@@ -1771,26 +1860,34 @@ export const stageFlyoutCss = `
         background: var(--colour-panel);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
-    /* A flyout the reader can size. The max-height above still caps it against the stage, so a
+    /* A flyout the reader can size. The placement's cap still holds it against the stage, so a
        remembered height from a taller window cannot push it off the top. */
     .stage-flyout.sizeable { position: absolute; }
     .stage-flyout.sizeable .stage-flyout-body { flex: 1 1 auto; min-height: 0; }
-    .stage-flyout.on-left { left: 8px; }
-    .stage-flyout.on-right { right: 8px; }
-    /* Centred on the stage, like the bar it belongs to. */
-    .stage-flyout.on-mid { left: 50%; transform: translateX(-50%); }
 
-    /* Opens UPWARDS from the bottom edge, because that is where its button is. A flyout that
-       appears at the top of the stage when you pressed something at the bottom reads as a
-       different panel opening rather than this one, and the eye has to go and find it.
+    /* The tail: what joins a flyout to the pill that opened it, the way a speech bubble is joined
+       to its speaker. A square turned on its corner with its middle on the box's edge, so the half
+       that shows is a point and its two outer sides carry the box's own border. It stands in the
+       gap the placement leaves (FLYOUT_GAP) and stops a pixel short of the pill's plate.
 
-       The clearance is bigger than the top edge's 40px: the preview's bottom row can be two plates
-       tall once the shader corner shows its source line under the switch. */
-    .stage-flyout.from-bottom {
-        top: auto;
-        bottom: 56px;
-        max-height: calc(100% - 72px);
+       Its place along the edge is set on it, measured from the box's OUTER edge; a positioned
+       child is measured from inside the border, hence the margin that takes the border back. */
+    .stage-flyout-tail {
+        position: absolute;
+        box-sizing: border-box;
+        width: 10px;
+        height: 10px;
+        margin-left: calc(-1 * var(--space-1));
+        border: var(--space-1) solid var(--colour-line-strong);
+        background: var(--colour-panel);
+        transform: translateX(-50%) rotate(45deg);
+        /* Never a target: it reaches over the gap towards the pill it points at. */
+        pointer-events: none;
     }
+    /* A flyout BELOW its pill points up from its top edge, one above its pill down from its foot.
+       Only the two sides that face outwards are drawn; the other two would cut across the box. */
+    .stage-flyout-tail.at-top { top: -6px; border-right: none; border-bottom: none; }
+    .stage-flyout-tail.at-bottom { bottom: -6px; border-left: none; border-top: none; }
 
     .stage-flyout-head {
         display: flex;
@@ -1974,5 +2071,403 @@ export const inspectorCss = `
         /* Over a border rather than inside it: a border would eat into the colour being judged. */
         outline: var(--space-1) solid var(--colour-line-strong);
         outline-offset: -1px;
+    }
+`;
+
+/**
+ * The flyout a row's info pill opens beside the dock - a hardpoint card's measurements, an
+ * ability's facts, a story type's documentation.
+ *
+ * Shared since the story graph's palette took it from the model preview: the same box, placed the
+ * same way (anchorFlyout), with the same tail. The markup is DetailsFlyout.
+ */
+export const detailsFlyoutCss = `
+    /* Pinned against the WINDOW, because the row it belongs to lives inside a scroller that would
+       clip it. anchorFlyout supplies the corner; everything here is the box itself. */
+
+    .details-flyout {
+        position: fixed;
+        z-index: 6;
+        width: 320px;
+        max-height: 62vh;
+        display: flex;
+        flex-direction: column;
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-radius: var(--radius-6);
+        background: var(--colour-panel);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    }
+
+    .details-head {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-6);
+        padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
+        border-bottom: var(--space-1) solid var(--colour-line);
+        font-size: var(--font-size-11);
+    }
+
+    .details-title {
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Takes what is left and gives it back: the title is what identifies the row, so it is the
+       half that survives a narrow box. */
+
+    .details-subtitle {
+        flex: 1;
+        min-width: 0;
+        color: var(--colour-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .details-head .icon-btn {
+        margin-left: auto;
+        align-self: center;
+    }
+
+    .details-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-8);
+        padding: var(--space-8) var(--space-8) var(--space-8);
+        overflow-y: auto;
+    }
+
+    /* The tail: what joins the flyout to the pill that opened it, the way a speech bubble is
+       joined to its speaker. A square turned on its corner with its middle on the edge that faces
+       the dock, so the half that shows is a point and its two outer sides carry the box's own
+       border. It stands in the gap the placement leaves and stops a pixel short of the dock.
+
+       Its place down the edge is set on it, measured from the box's OUTER edge; a positioned child
+       is measured from inside the border, hence the margin that takes the border back. */
+
+    .details-tail {
+        position: absolute;
+        right: -6px;
+        box-sizing: border-box;
+        width: 10px;
+        height: 10px;
+        margin-top: calc(-1 * var(--space-1));
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-bottom: none;
+        border-left: none;
+        background: var(--colour-panel);
+        transform: translateY(-50%) rotate(45deg);
+        /* Never a target: it reaches over the gap towards the pill it points at. */
+        pointer-events: none;
+    }
+`;
+
+/**
+ * The search of a list in a dock: a plate with a magnifier and the list's own toggles, whose field
+ * opens to the left of icons that never move.
+ *
+ * Shared since the story graph's palette took the model tree's search. The markup is SearchPlate.
+ */
+export const searchPlateCss = `
+    /* Drawn ON the list, hard against its bottom-right corner.
+
+       Closed, it is a few icons hugging the right. Open, it also claims the left edge of the pane -
+       which is the whole reason for floating it: sharing a row with the icons, the field measured
+       58px of the 214 a docked panel has, and a name does not fit in 58px. Nothing moves when it
+       opens, because the icons are anchored to the right edge either way. */
+
+    .search-plate {
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        /* Wraps, and the plate is anchored by its BOTTOM, so a line that does not fit is added
+           above the icons rather than below them. The icons therefore never move whatever the dock
+           is doing: wide, this is one row with the field to their left, which is the shape it was
+           designed as; narrow, the field takes a line of its own on top. Measured at a docked 214px
+           the field got 34px sharing the row - not enough to read a name in - and the same layout
+           at twice the width gives it 135px, which is. */
+        flex-wrap: wrap;
+        gap: var(--space-4);
+        padding: var(--space-2);
+        border-radius: var(--radius-6);
+        /* Its own plate. Rows run underneath it, and a transparent strip over a list of names is
+           unreadable in both directions. */
+        background: color-mix(in srgb, var(--colour-sidebar) 88%, transparent);
+        border: var(--space-1) solid var(--colour-line-strong);
+    }
+
+    /* On the corner of a list that scrolls inside a pane of its own, which the pane positions. */
+
+    .search-plate.floating {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+    }
+
+    /* Open, a plate that keeps its field inside it takes a width of its own from the corner it
+       stands on. It stood on a list a dock wide when this stretched from edge to edge; on a grid
+       or a canvas that would be a bar across the page. */
+
+    .search-plate.floating.open:not(.beside),
+    .search-plate.placed.open:not(.beside) {
+        width: min(440px, calc(100% - 12px));
+    }
+
+    /* Where its host puts it, among other controls on a corner. */
+
+    .search-plate.placed {
+        position: relative;
+    }
+
+    /* At the foot of a scroller it is the last child of: it stays on the scroller's bottom edge
+       while the list moves under it, and the room it takes at the end of the content is the pad
+       that lets the last row be scrolled clear of it. Closed it is as wide as its icons, against
+       the right; open it takes the row. */
+
+    .search-plate.sticky {
+        position: sticky;
+        bottom: 6px;
+        width: fit-content;
+        margin-left: auto;
+        /* In a column that is taller than what it holds, the plate takes the foot: the free space
+           goes above it. In an ordinary block these two do nothing. */
+        margin-top: auto;
+        align-self: flex-end;
+    }
+
+    .search-plate.sticky.open:not(.beside) {
+        width: auto;
+        margin-left: 0;
+        align-self: stretch;
+    }
+
+    /* The field's box: the input, with the three ways of reading a pattern over its trailing edge.
+       In the plate's own row it takes the room to the left of the icons. The basis is what decides
+       where it wraps: below this it is not worth having on the row, and the whole line goes above
+       the icons instead. */
+
+    .search-plate .search-plate-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+        flex: 1 1 180px;
+        min-width: 0;
+    }
+
+    /* Beside the plate, for a plate in a dock: SearchPlate places it against the window, as tall
+       as the plate and with its right edge under the plate's left one. The two then draw as one
+       plate that grew leftwards, over the stage, where a name has room. Fixed, because the plate
+       stands in a panel that scrolls and a child of one is clipped by it. Above the stage's own
+       flyouts: the reader opened this last, and is typing in it. */
+
+    .search-plate .search-plate-box.beside {
+        position: fixed;
+        z-index: 25;
+        box-sizing: border-box;
+        padding: var(--space-2);
+        border: var(--space-1) solid var(--colour-line-strong);
+        border-radius: var(--radius-6) 0 0 var(--radius-6);
+        background: color-mix(in srgb, var(--colour-sidebar) 94%, transparent);
+    }
+
+    .search-plate.beside {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+
+    /* The line above the field: the search's dropdown filters as pills, and why a pattern does not
+       compile. A whole line of its own, so the field and the icons wrap under it and - the plate
+       being anchored by its bottom - the line is added above icons that do not move. */
+
+    .search-plate .search-plate-above {
+        flex: 1 0 100%;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        min-width: 0;
+    }
+
+    .search-plate .search-plate-pills {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: var(--space-4);
+    }
+
+    /* At full length here, which is the point of the line - up to a width a name fits in. */
+
+    .search-plate .pill-select .pill-value {
+        max-width: 28ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: left;
+    }
+
+    /* A pill away from its resting value narrows the list. It carries the accent a quick filter
+       does, so an open plate shows at a glance which of its filters are set. */
+
+    .search-plate .pill-select.set {
+        border-color: var(--colour-action);
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
+    }
+
+    .search-plate .pill-select.set .pill-mark {
+        border-left-color: var(--colour-action-ink);
+        opacity: 1;
+    }
+
+    .search-plate .pill-select.set > svg {
+        opacity: 1;
+    }
+
+    .search-plate .search-plate-error {
+        padding: 0 var(--space-2);
+        font-size: var(--font-size-smaller);
+        color: var(--colour-error);
+        overflow-wrap: anywhere;
+    }
+
+    /* A count on a quick filter: how many rows switching it on would bring back. */
+
+    .search-plate .search-plate-count {
+        font-size: var(--font-size-smallest);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* The editor's own input tokens, declared rather than inherited. Every other input in the
+       extension picks these up from the rule VS Code injects into a webview, but this one sits on
+       a plate of its own over a list, where an input that merely happens to look right is one host
+       stylesheet change away from looking wrong. Rounded to match the plate it stands in. */
+
+    .search-plate .search-plate-field {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        /* The ICONS' height, exactly. Left to its own, the field came out 27px against their 22,
+           so opening it grew the row from 30 to 35 - and because the plate is anchored by its
+           bottom and its items are centred, the whole icon strip rose 2px under the pointer that
+           had just pressed it. Padding goes with it: an input centres its own text once it has a
+           height, so the vertical padding was only ever there to make one. */
+        height: 22px;
+        padding: 0 var(--search-modes-inset) 0 var(--space-8);
+        color: var(--colour-input-ink);
+        background: var(--colour-input);
+        border: var(--space-1) solid var(--colour-input-line);
+        border-radius: var(--radius-3);
+        font-family: inherit;
+        font-size: inherit;
+    }
+
+    /* Inset, so the ring is drawn ON the field rather than growing it - an outline that adds a
+       pixel each side would nudge the icons every time the box took focus. */
+
+    .search-plate .search-plate-field:focus {
+        outline: var(--space-1) solid var(--colour-focus);
+        outline-offset: -1px;
+    }
+
+    .search-plate .search-plate-field::placeholder {
+        color: var(--colour-placeholder);
+    }
+
+    /* A pattern that does not compile empties the list. The field says so before the reader goes
+       looking for the rows. */
+
+    .search-plate .search-plate-field[aria-invalid="true"] {
+        border-color: var(--colour-error);
+    }
+
+    /* The three modes, over the field's trailing edge. One of three, but NOT drawn as the joined,
+       filled segments a settings pane gets: three of those wall to wall inside a 22px field read
+       as squeezed, a block the pattern had to fit beside. Here each is a glyph with air around it,
+       the way an editor's find widget draws them - no border, no fill, and only the chosen one
+       carries the accent. */
+
+    .search-plate .search-plate-modes {
+        position: absolute;
+        right: 4px;
+        display: flex;
+    }
+
+    .search-plate .search-plate-box.beside .search-plate-modes {
+        right: 7px;
+    }
+
+    .search-plate .search-plate-modes .mode-selector {
+        width: auto;
+        gap: var(--space-4);
+    }
+
+    .search-plate .search-plate-modes .mode-selector button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: 20px;
+        min-width: 20px;
+        height: 16px;
+        padding: 0;
+        border: none;
+        border-radius: var(--radius-3);
+        background: transparent;
+        color: var(--colour-input-ink);
+    }
+
+    /* A mode is drawn as the characters it means, in the code font those characters are typed in.
+       The asterisk and the dot sit high and low in their cells, so the line is as tall as the
+       button and the mark is centred by the flex box rather than by a line height. At the field's
+       own ink and full strength: two thin characters dimmed the way an idle icon is came out too
+       faint to read, and the accent on the chosen one is enough to tell them apart. */
+
+    .search-plate .search-plate-modes .mode-mark {
+        font-family: var(--font-family-code);
+        font-size: var(--font-size-12);
+        line-height: 1;
+        letter-spacing: 0;
+    }
+
+    .search-plate .search-plate-modes .mode-selector button:hover {
+        background: var(--colour-action-2-hover);
+    }
+
+    .search-plate .search-plate-modes .mode-selector button.active {
+        background: var(--colour-action);
+        color: var(--colour-action-ink);
+    }
+
+    /* The one button that never moves. Everything else in this row is what it opens onto, so it
+       keeps its width whichever of the two is showing. */
+
+    .search-plate .search-plate-toggle {
+        flex: 0 0 auto;
+    }
+
+    .search-plate-icons {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        flex: 0 0 auto;
+    }
+
+    .search-plate .icon-btn {
+        font-size: var(--font-size-smaller);
+        padding: var(--space-2) var(--space-8);
+        border-radius: var(--radius-6);
+    }
+
+    /* The filter icon once something is set: the reset. In the warning colour rather than the
+       accent the quick filters carry, or it would read as one more toggle that happens to be on.
+       At full strength: an icon button rests at 72%, and the warning colour dimmed that far came
+       out a pale tan on a light theme's panel, well under the contrast an icon needs. */
+
+    .search-plate .icon-btn.search-plate-reset.set {
+        color: var(--colour-warning);
+        opacity: 1;
     }
 `;

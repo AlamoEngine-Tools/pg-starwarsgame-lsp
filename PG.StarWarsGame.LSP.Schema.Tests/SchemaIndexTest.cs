@@ -326,6 +326,27 @@ public sealed class SchemaIndexTest
         Assert.Same(planetType, param.ObjectType);
     }
 
+    [Fact]
+    public void SchemaIndex_CarriesAnEnumValuesLabel_IntoTheResolvedDefinition()
+    {
+        var rawEnum = new RawEnumDefinition
+        {
+            Name = "StoryEventType",
+            Values =
+            [
+                new RawEnumValueDefinition
+                {
+                    Name = "STORY_ELAPSED",
+                    Label = new Dictionary<string, string> { ["en"] = "Time elapsed" }
+                }
+            ]
+        };
+
+        var index = Build([], [], [rawEnum]);
+
+        Assert.Equal("Time elapsed", index.GetEnum("StoryEventType")!.Values.Single().Label["en"]);
+    }
+
     // The story enum files declare no referenceKind on their params: a DynamicEnumValue names its
     // enum and a NameReference its type, and that is the whole of the declaration. The index
     // resolves both from the name, or the enum params never complete or validate.

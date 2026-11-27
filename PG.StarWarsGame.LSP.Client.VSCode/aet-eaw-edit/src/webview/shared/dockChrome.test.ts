@@ -171,14 +171,31 @@ describe("dockChromeCss", () => {
 
 describe("stageFlyoutCss", () => {
     /**
-     * Shared since the story graph's colour key (#128) took the preview's flyout. A flyout opened
-     * from a button on the bottom edge must grow upwards from there - one that appears at the top
-     * reads as a different panel.
+     * Shared since the story graph's colour key (#128) took the preview's flyout. Where a flyout
+     * sits is measured against the pill that opens it (placeStageFlyout), so the stylesheet must
+     * not pin it to a corner or an edge: a rule here would fight the measured place.
      */
-    it("opens a bottom-edge flyout upwards", () => {
+    it("leaves the place to the pill, pinning no corner and no edge", () => {
+        assert.doesNotMatch(stageFlyoutCss, /\.stage-flyout\.(on-|from-)/);
+        assert.doesNotMatch(
+            stageFlyoutCss,
+            /\.stage-flyout\s*\{[^}]*\b(top|bottom|left|right):/,
+        );
+    });
+
+    /** The tail points at the pill, so it is on the edge that faces the pill and nowhere else. */
+    it("draws the tail on the top edge or the foot, and never as a target", () => {
         assert.match(
             stageFlyoutCss,
-            /\.stage-flyout\.from-bottom\s*\{[^}]*top:\s*auto[^}]*bottom:/,
+            /\.stage-flyout-tail\.at-top\s*\{[^}]*\btop:/,
+        );
+        assert.match(
+            stageFlyoutCss,
+            /\.stage-flyout-tail\.at-bottom\s*\{[^}]*\bbottom:/,
+        );
+        assert.match(
+            stageFlyoutCss,
+            /\.stage-flyout-tail\s*\{[^}]*pointer-events:\s*none/,
         );
     });
 

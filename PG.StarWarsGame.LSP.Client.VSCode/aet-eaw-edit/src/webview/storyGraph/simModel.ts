@@ -8,6 +8,7 @@
  */
 
 import * as l10n from "@vscode/l10n";
+import { compileMatcher, type SearchMode } from "../shared/searchPattern";
 
 import {
     StoryGraphEdgeDto,
@@ -205,29 +206,40 @@ export function traceRows(
 export function filterTrace(
     rows: readonly TraceRow[],
     query: string,
+    mode: SearchMode = "text",
 ): TraceRow[] {
-    const trimmed = query.trim().toLowerCase();
+    const trimmed = query.trim();
     if (!trimmed) {
         return [...rows];
     }
-    const tickMatch = /^t(\d+)$/.exec(trimmed);
-    if (tickMatch) {
-        const tick = Number(tickMatch[1]);
-        return rows.filter((row) => row.tick === tick);
+    // `t12` asks for a tick, in plain text. With wildcards or a regular expression it is a pattern
+    // like any other - and the line it is matched against starts with the tick, so it still finds
+    // that tick, and `^t12 ` asks for it exactly.
+    if (mode === "text") {
+        const tickMatch = /^t(\d+)$/i.exec(trimmed);
+        if (tickMatch) {
+            const tick = Number(tickMatch[1]);
+            return rows.filter((row) => row.tick === tick);
+        }
     }
-    return rows.filter((row) =>
-        [
-            row.node,
-            row.via ?? "",
-            row.cause,
-            row.detail ?? "",
-            row.to ?? "",
-            row.from ?? "",
-        ]
-            .join(" ")
-            .toLowerCase()
-            .includes(trimmed),
-    );
+    const answers = compileMatcher(trimmed, mode).test;
+    return rows.filter((row) => answers(traceLine(row, mode)));
+}
+
+/**
+ * A row as one line for a pattern. Plain text reads what the row says, as it always did; wildcards
+ * and regular expressions read the tick in front of it, so a pattern can ask for a tick too.
+ */
+function traceLine(row: TraceRow, mode: SearchMode): string {
+    const says = [
+        row.node,
+        row.via ?? "",
+        row.cause,
+        row.detail ?? "",
+        row.to ?? "",
+        row.from ?? "",
+    ].join(" ");
+    return mode === "text" ? says : `t${row.tick} ${says}`;
 }
 
 // ── Arming ───────────────────────────────────────────────────────────────────

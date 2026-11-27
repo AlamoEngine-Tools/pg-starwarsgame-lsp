@@ -19,6 +19,7 @@ import * as l10n from "@vscode/l10n";
 import {
     CSSProperties,
     DragEvent,
+    Fragment,
     PointerEvent as ReactPointerEvent,
     useCallback,
     useEffect,
@@ -28,11 +29,14 @@ import {
     useState,
 } from "react";
 import { Combobox } from "./shared/Combobox";
+import { badgeIcon } from "./shared/badges";
 import { Icon, SeverityMark } from "./shared/Icon";
 import { ModalLayerContext } from "./shared/Modal";
-import { SelectField } from "./shared/SelectField";
+import { SearchPlate } from "./shared/SearchPlate";
+import { compileMatcher, type SearchMode } from "./shared/searchPattern";
 import {
     comboboxCss,
+    detailsFlyoutCss,
     dockBodyCss,
     dockChromeCss,
     dockHeaderCss,
@@ -41,6 +45,7 @@ import {
     problemsPanelCss,
     rightDockCss,
     rotarySwitchCss,
+    searchPlateCss,
     stageChromeCss,
     stageFlyoutCss,
 } from "./shared/dockChrome";
@@ -60,7 +65,7 @@ import {
     isLifecycleStep,
     resolvePath,
 } from "./simPlayback";
-import { ClearFiltersButton } from "./storyGraph/ClearFiltersButton";
+import { GraphFilterPlate } from "./storyGraph/GraphFilterPlate";
 import {
     canvasEdgeStyle,
     type CanvasEdgeStyle,
@@ -68,6 +73,7 @@ import {
 } from "./storyGraph/canvasEdgeStyle";
 import { branchKey, type BranchKeyEntry } from "./storyGraph/colourKey";
 import { ColourKeyFlyout } from "./storyGraph/ColourKeyFlyout";
+import { eventIcon } from "./storyGraph/eventIcons";
 import { FrameNotifier } from "./storyGraph/frameNotifier";
 import {
     canReuseStoredLayout,
@@ -79,6 +85,17 @@ import { createLabelSizer, LINE_RATIO, wrapLabel } from "./storyGraph/lodLabel";
 import { facetList } from "./storyGraph/facets";
 import { PathFilterMenu } from "./storyGraph/PathFilterMenu";
 import { noteBadge, type StoryNote } from "./storyGraph/typeNotes";
+import { noteLine, pillSeverity, type TypeDoc } from "./storyGraph/typeDocs";
+import { TypeInfoFlyout, type TypeInfo } from "./storyGraph/TypeInfoFlyout";
+import {
+    breakPieces,
+    matchesType,
+    otherName,
+    tileName,
+    typeNameMode,
+    type TypeNameMode,
+    type TypeNames,
+} from "./storyGraph/typeNames";
 import { type PathDirection } from "./storyGraph/pathDirection";
 import {
     arrangePositions,
@@ -92,6 +109,13 @@ import {
     shouldWindow,
 } from "./storyGraph/lodPolicy";
 import { Extent, fitZoom } from "./storyGraph/viewportFit";
+import {
+    CANVAS_ZOOM_MAX,
+    CANVAS_ZOOM_MIN,
+    stepZoom,
+    zoomAboutCentre,
+} from "./storyGraph/canvasZoom";
+import { ZoomSlider } from "./shared/ZoomSlider";
 import { booleanParamLabel, paramLabel } from "./storyGraph/paramLabels";
 import { paramRowSpecs } from "./storyGraph/paramRows";
 import { StagedRenames } from "./storyGraph/stagedRenames";
@@ -161,6 +185,8 @@ import {
 import { initPanelLayout } from "./shared/panelLayoutBridge";
 import { createRequester } from "./shared/hostRequest";
 import { poster, transport, vscodeApi } from "./shared/vscodeApi";
+import { PageToolbar } from "./shared/PageToolbar";
+import { requestDiscard } from "./shared/discardRequest";
 import type {
     StoryGraphToHost,
     StoryGraphToWebview,
@@ -200,6 +226,8 @@ initPanelLayout(vscodeApi);
  */
 interface FilterState {
     nameFilter: string;
+    /** How `nameFilter` is read, as the filter plate's field shows it. Not a filter: the reset keeps it. */
+    nameFilterMode: SearchMode;
     branch: string;
     lifecycle: string;
     reachableFrom: string;
@@ -327,6 +355,7 @@ async function fetchParamOptions(
 
 const EMPTY_FILTERS: FilterState = {
     nameFilter: "",
+    nameFilterMode: "text",
     branch: "",
     lifecycle: "",
     reachableFrom: "",
@@ -756,6 +785,12 @@ interface EditorHandle {
 
     /** Pans the viewport so (graphX, graphY) sits at the centre - the minimap's click-to-navigate. */
     panTo(graphX: number, graphY: number): void;
+
+    /** The canvas's zoom, as a factor: 1 is 100%. */
+    zoomLevel(): number;
+
+    /** Zooms the canvas to `zoom`, keeping the middle of the view where it is - the dock foot's zoom. */
+    zoomTo(zoom: number): void;
 
     /** Whether the graph is in windowed/LOD mode (big graph): the LOD overview is drawn and only the
      * visible window mounts into rete. The overview stays up at all zoom levels so edges (and off-
@@ -3236,6 +3271,19 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 rect.height / 2 - graphY * k,
             );
         },
+        zoomLevel(): number {
+            return area.area.transform.k;
+        },
+        zoomTo(zoom: number): void {
+            const rect = container.getBoundingClientRect();
+            const { ox, oy } = zoomAboutCentre(
+                area.area.transform,
+                { width: rect.width, height: rect.height },
+                zoom,
+            );
+            // The 'zoomed' pipe then reconciles the mounted window and tells the foot, as a wheel does.
+            void area.area.zoom(zoom, ox, oy);
+        },
         isWindowed(): boolean {
             return windowed;
         },
@@ -5701,31 +5749,20 @@ const Shell = styled.div`
     ${dockHeaderCss}
     ${dockBodyCss}
     ${dockOverviewCss}
-        /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
-        /* Tools on the left set the left gap; mirror it on the right, minimap flexes to fill between. */
+    /* The minimap takes the row, and the canvas tools stand at its right in two columns - the zoom
+       pair, then fit and arrange, then the two lanes - so the stack is as tall as the minimap
+       rather than a column that outgrows it. */
     .overview-mid {
         display: flex;
         align-items: center;
         gap: var(--space-8);
-        padding-right: var(--space-8);
     }
 
     .overview-tools {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(2, auto);
         gap: var(--space-4);
         flex-shrink: 0;
-    }
-
-    .filters-below {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-4);
-    }
-
-    .filters-below .select-field {
-        display: flex;
-        width: 100%;
     }
 
     /* Icons inherit their button's colour (never coloured individually) and scale per context. An
@@ -5766,10 +5803,13 @@ const Shell = styled.div`
 
     .palette-scroll {
         min-width: 0;
-    }
-
-    .palette-scroll .dock-search {
-        margin-bottom: var(--space-8);
+        /* A column at least as tall as the dock's content, so the search plate, its last child,
+           stands at the dock's foot however little the palette holds. Narrowed to one tile the
+           palette is far shorter than the dock, and a plate that followed the last tile up moved
+           under the hand typing in it. */
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
     }
 
     .palette-new {
@@ -5794,10 +5834,171 @@ const Shell = styled.div`
         border-style: solid;
         border-width: var(--space-1);
         cursor: grab;
+        /* For the info pill in its corner. */
+        position: relative;
+    }
+
+    /* The pill in a type tile's corner: it opens the type's documentation beside the dock, and it
+       is the tile's only mark - red where the engine does not run the type, yellow where nobody
+       has verified it. The look is the shared info badge's; this is where it stands. */
+
+    .palette-tile .tile-info {
+        position: absolute;
+        top: var(--space-2);
+        right: var(--space-2);
+    }
+
+    .palette-tile .tile-info.active {
+        opacity: 1;
+        background: var(--colour-toolbar-hover);
+    }
+
+    ${detailsFlyoutCss}
+
+    ${searchPlateCss}
+
+    /* What the documentation flyout holds. Prose wraps here, unlike a card's facts, and the two
+       names in its head are a type's two names, so neither is cut short while there is room. */
+
+    .type-doc .details-body {
+        font-size: var(--font-size-12);
+        line-height: 1.45;
+    }
+
+    .type-doc p {
+        margin: 0;
+    }
+
+    .type-doc-notes {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .type-doc-notes li {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-6);
+    }
+
+    .type-doc-notes li svg {
+        flex-shrink: 0;
+        margin-top: var(--space-2);
+    }
+
+    .type-doc-notes .sev-warning svg {
+        color: var(--colour-warning);
+    }
+    .type-doc-notes .sev-error svg {
+        color: var(--colour-error);
+    }
+
+    .type-doc-heading {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-6);
+        padding-top: var(--space-4);
+        border-top: var(--space-1) solid var(--colour-line);
+        font-size: var(--font-size-11);
+        color: var(--colour-muted);
+    }
+
+    .type-doc-heading .section-count {
+        margin-left: auto;
+    }
+
+    .type-doc-none {
+        color: var(--colour-muted);
+    }
+
+    .type-doc-params {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-8);
+    }
+
+    /* A parameter: its position, its name, what it holds, then the sentence under the three. */
+
+    .type-doc-params li {
+        display: grid;
+        grid-template-columns: auto auto 1fr auto;
+        align-items: baseline;
+        column-gap: var(--space-6);
+        row-gap: var(--space-2);
+    }
+
+    .type-doc-params .param-position {
+        color: var(--colour-muted);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .type-doc-params .param-name {
+        font-weight: 600;
+    }
+
+    .type-doc-params .param-kind {
+        min-width: 0;
+        color: var(--colour-muted);
+        font-family: var(--font-family-code);
+        font-size: var(--font-size-11);
+        overflow-wrap: anywhere;
+    }
+
+    .type-doc-params .param-optional {
+        color: var(--colour-muted);
+        font-size: var(--font-size-11);
+    }
+
+    .type-doc-params .param-text {
+        grid-column: 2 / -1;
+        color: var(--colour-muted);
     }
 
     .palette-tile:hover {
         outline: var(--space-1) solid var(--colour-focus);
+    }
+
+    /* A palette tile is smaller than the dock's shared tile. There are two hundred type tiles and
+       a type's display name is two or three short words, so the size is fitted to those names
+       (--palette-tile-w and -h) and the dock shows more of them at once. The three structural
+       tiles - New event, AND, OR - are the same size: they are the same kind of thing to drag,
+       and at the shared size they stood one to a row above a grid of two. Where the reader has
+       asked for technical names every row is taller: an identifier runs to three lines where a
+       display name fits two. */
+
+    .palette-scroll .tile-grid {
+        grid-template-columns: repeat(auto-fill, var(--palette-tile-w));
+        grid-auto-rows: var(--palette-tile-h);
+    }
+
+    .palette-scroll.technical-names .tile-grid {
+        grid-auto-rows: var(--palette-tile-h-technical);
+    }
+
+    .palette-scroll .palette-tile {
+        gap: var(--space-2);
+        padding: var(--space-4);
+    }
+
+    /* Whole words. The shared tile breaks a label anywhere, which is right for a raw token and
+       cuts a display name in the middle of a word; here a line breaks at a space, at the break
+       opportunities a technical name is given after each underscore, and inside a word only when
+       that word alone is wider than the tile. */
+
+    .palette-scroll .palette-tile .tile-label {
+        font-size: var(--font-size-11);
+        overflow-wrap: break-word;
+        word-break: normal;
+    }
+
+    .palette-scroll.technical-names .palette-tile .tile-label {
+        -webkit-line-clamp: 3;
     }
 
     .palette-empty {
@@ -6201,11 +6402,12 @@ const Shell = styled.div`
         display: none;
     }
 
-    /* Trace: the problems bar's frame, with a filter row pinned under the title. */
+    /* Trace: the problems bar's frame, its search plate on the lower right corner. The frame does
+       not scroll - only its row list does - so the plate stays on the corner while the rows move. */
 
     .sim-trace {
         position: relative;
-        overflow-y: auto;
+        overflow: hidden;
         border-top: var(--space-1) solid var(--colour-line);
         background: var(--colour-sidebar);
         flex-shrink: 0;
@@ -6213,20 +6415,10 @@ const Shell = styled.div`
         padding: 0 var(--space-4) var(--space-2);
     }
 
-    .sim-trace-tools {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        display: flex;
-        gap: var(--space-4);
-        align-items: center;
-        padding: var(--space-2) 0;
-        background: var(--colour-sidebar);
-    }
+    /* Room past the last row, so it can be scrolled out from under the plate. */
 
-    .sim-trace-tools input {
-        flex: 1;
-        min-width: 0;
+    .sim-trace .problem-list {
+        padding-bottom: calc(var(--space-24) + var(--space-16));
     }
 
     .sim-trace-row {
@@ -6369,9 +6561,31 @@ const Shell = styled.div`
 
     /* The colour key's corner plate - bottom right, where the legend strip used to end. */
 
-    .key-corner {
+    /* The canvas's lower right corner, shared by the event filter's plate and the colour key: one
+       row along the bottom edge, the key in the corner and the plate to its left, growing leftwards
+       and upwards when it opens. As wide as the canvas so the open plate can take a share of it;
+       the empty part of the row lets the canvas under it be dragged. */
+
+    .canvas-foot {
+        position: absolute;
+        left: 8px;
         right: 8px;
         bottom: 8px;
+        z-index: 2;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-end;
+        gap: var(--space-6);
+        pointer-events: none;
+    }
+
+    .canvas-foot > * {
+        pointer-events: auto;
+    }
+
+    .canvas-foot > .key-corner {
+        position: static;
+        flex-shrink: 0;
     }
 
     /* The colour key (storyGraph/ColourKeyFlyout). One row per swatch, the swatch in a fixed-width
@@ -6491,9 +6705,29 @@ function App(): React.JSX.Element {
     // facet list above, which also names branches the current filter is hiding.
     const [branchEntries, setBranchEntries] = useState<BranchKeyEntry[]>([]);
     const [colourKeyOpen, setColourKeyOpen] = useState(false);
+    /** The pill that opens the colour key, which is where the key opens. */
+    const colourKeyPill = useRef<HTMLButtonElement | null>(null);
     const [threads, setThreads] = useState<string[]>([]);
     const [eventTypes, setEventTypes] = useState<string[]>([]);
     const [rewardTypes, setRewardTypes] = useState<string[]>([]);
+    // What each type is called in words, and which of its two names the palette's tiles show. The
+    // labels come with the schema, the choice is the reader's setting.
+    const [eventTypeLabels, setEventTypeLabels] = useState<
+        ReadonlyMap<string, string>
+    >(new Map());
+    const [rewardTypeLabels, setRewardTypeLabels] = useState<
+        ReadonlyMap<string, string>
+    >(new Map());
+    const [typeNames, setTypeNames] = useState<TypeNameMode>("display");
+    // What the schema says about each type in prose, and whose documentation is open beside the
+    // palette - one at a time, like every row flyout.
+    const [eventTypeDocs, setEventTypeDocs] = useState<
+        ReadonlyMap<string, TypeDoc>
+    >(new Map());
+    const [rewardTypeDocs, setRewardTypeDocs] = useState<
+        ReadonlyMap<string, TypeDoc>
+    >(new Map());
+    const [typeInfo, setTypeInfo] = useState<TypeInfo | null>(null);
     const [status, setStatus] = useState<string | null>(
         l10n.t("Loading story graph..."),
     );
@@ -6669,6 +6903,19 @@ function App(): React.JSX.Element {
             type: "saveBatch",
             commands: [...pendingCommands],
         });
+    }, []);
+
+    // Drops what is staged and stays in Edit: the graph is read again, which shows what is saved.
+    const discardEdits = useCallback(() => {
+        void requestDiscard(transport, pendingCommands.length).then(
+            (confirmed) => {
+                if (!confirmed) {
+                    return;
+                }
+                clearPendingCommands();
+                post({ type: "fetch", filters: filtersRef.current });
+            },
+        );
     }, []);
 
     const validateEdits = useCallback(() => {
@@ -7312,6 +7559,38 @@ function App(): React.JSX.Element {
                     setRewardTypes(
                         (msg.rewardTypes as string[] | undefined) ?? [],
                     );
+                    setEventTypeLabels(
+                        new Map(
+                            Object.entries(
+                                (msg.eventTypeLabels as
+                                    Record<string, string> | undefined) ?? {},
+                            ),
+                        ),
+                    );
+                    setRewardTypeLabels(
+                        new Map(
+                            Object.entries(
+                                (msg.rewardTypeLabels as
+                                    Record<string, string> | undefined) ?? {},
+                            ),
+                        ),
+                    );
+                    setEventTypeDocs(
+                        new Map(
+                            Object.entries(
+                                (msg.eventTypeDocs as
+                                    Record<string, TypeDoc> | undefined) ?? {},
+                            ),
+                        ),
+                    );
+                    setRewardTypeDocs(
+                        new Map(
+                            Object.entries(
+                                (msg.rewardTypeDocs as
+                                    Record<string, TypeDoc> | undefined) ?? {},
+                            ),
+                        ),
+                    );
                     // EventNodeView is rendered by rete's own portal pipeline, not as an App
                     // child, so it can't receive these as React props - mirrored into module
                     // scope (eventTypeParams/rewardTypeParams/untestedTypes) for that reason.
@@ -7502,6 +7781,9 @@ function App(): React.JSX.Element {
                         simulate: msg.simulate === true,
                     });
                     break;
+                case "typeNames":
+                    setTypeNames(typeNameMode(msg.mode));
+                    break;
                 case "confirmStageResult":
                     if (msg.proceed) {
                         stageCommand(msg.payload as Record<string, unknown>);
@@ -7594,7 +7876,11 @@ function App(): React.JSX.Element {
 
     const clearFilters = (): void => {
         setNameDraft("");
-        fetchGraph({ ...EMPTY_FILTERS });
+        // The mode stays: it is how the reader types patterns, not something that narrows the graph.
+        fetchGraph({
+            ...EMPTY_FILTERS,
+            nameFilterMode: filtersRef.current.nameFilterMode,
+        });
     };
     const toggleLane = (which: "thread" | "chapter"): void => {
         const nextThread =
@@ -7708,6 +7994,70 @@ function App(): React.JSX.Element {
                         onClose={() => setCreateRequest(null)}
                     />
                 ) : null}
+                <PageToolbar
+                    // A window without story editing shows the story and stages nothing.
+                    save={
+                        availableModes.edit
+                            ? {
+                                  title: l10n.t(
+                                      "Save - write all staged changes to the XML files",
+                                  ),
+                                  pending: pendingCount,
+                                  disabled:
+                                      mode !== "edit" ||
+                                      pendingCount === 0 ||
+                                      saving,
+                                  disabledReason:
+                                      mode !== "edit"
+                                          ? l10n.t("Save - Edit mode only")
+                                          : saving
+                                            ? l10n.t(
+                                                  "Save - writing the staged changes now",
+                                              )
+                                            : l10n.t(
+                                                  "Save - nothing is staged",
+                                              ),
+                                  onSave: saveEdits,
+                              }
+                            : undefined
+                    }
+                    discard={
+                        availableModes.edit
+                            ? {
+                                  title: l10n.t(
+                                      "Discard - drop all staged changes",
+                                  ),
+                                  disabled:
+                                      mode !== "edit" ||
+                                      pendingCount === 0 ||
+                                      saving,
+                                  disabledReason:
+                                      mode !== "edit"
+                                          ? l10n.t("Discard - Edit mode only")
+                                          : saving
+                                            ? l10n.t(
+                                                  "Discard - writing the staged changes now",
+                                              )
+                                            : l10n.t(
+                                                  "Discard - nothing is staged",
+                                              ),
+                                  onDiscard: discardEdits,
+                              }
+                            : undefined
+                    }
+                    verdict={
+                        <SeverityTag
+                            severity={severity}
+                            count={problems.length}
+                            title={l10n.t(
+                                "Validate - check the story for problems (opens the panel below)",
+                            )}
+                            onClick={() => {
+                                validateEdits();
+                            }}
+                        />
+                    }
+                />
                 <div className="body">
                     <div className="canvas-column">
                         <div className="canvas-area">
@@ -7733,23 +8083,38 @@ function App(): React.JSX.Element {
                                     {status ?? l10n.t("Arranging layout...")}
                                 </p>
                             ) : null}
-                            {/* The colour key, on a corner plate like the preview's stage controls. After
-                        the status cover, so the key can still be opened while a layout runs. */}
-                            <div className="stage-chrome key-corner">
-                                <IconButton
-                                    icon="details"
-                                    title={l10n.t("Colour key")}
-                                    className={
-                                        colourKeyOpen ? "active" : undefined
-                                    }
-                                    expanded={colourKeyOpen}
-                                    onClick={() =>
-                                        setColourKeyOpen((open) => !open)
-                                    }
+                            {/* The canvas's lower right corner: the event filter, and the colour key on
+                        a corner plate like the preview's stage controls. After the status cover, so
+                        both can still be used while a layout runs. */}
+                            <div className="canvas-foot">
+                                <GraphFilterPlate
+                                    filters={filters}
+                                    draft={nameDraft}
+                                    onDraft={setNameDraft}
+                                    onFilter={setFilter}
+                                    onReset={clearFilters}
+                                    branches={branches}
+                                    lifecycles={LIFECYCLES}
+                                    plotStates={PLOT_STATES}
                                 />
+                                <div className="stage-chrome key-corner">
+                                    <IconButton
+                                        icon="details"
+                                        title={l10n.t("Colour key")}
+                                        className={
+                                            colourKeyOpen ? "active" : undefined
+                                        }
+                                        expanded={colourKeyOpen}
+                                        ref={colourKeyPill}
+                                        onClick={() =>
+                                            setColourKeyOpen((open) => !open)
+                                        }
+                                    />
+                                </div>
                             </div>
                             {colourKeyOpen ? (
                                 <ColourKeyFlyout
+                                    anchor={colourKeyPill}
                                     branches={branchEntries}
                                     onClose={() => setColourKeyOpen(false)}
                                 />
@@ -7776,6 +8141,31 @@ function App(): React.JSX.Element {
                                     actions={simActions}
                                     onSelect={setSimSelection}
                                     onClose={() => setSimSelection(null)}
+                                />
+                            ) : null}
+                            {/* A type's documentation, beside the dock rather than unfolded inside the
+                        palette. Only in Edit mode: the palette is the one place it opens from. */}
+                            {mode === "edit" && typeInfo ? (
+                                <TypeInfoFlyout
+                                    info={typeInfo}
+                                    names={{
+                                        mode: typeNames,
+                                        labels:
+                                            typeInfo.category === "trigger"
+                                                ? eventTypeLabels
+                                                : rewardTypeLabels,
+                                    }}
+                                    doc={(typeInfo.category === "trigger"
+                                        ? eventTypeDocs
+                                        : rewardTypeDocs
+                                    ).get(typeInfo.type)}
+                                    params={
+                                        (typeInfo.category === "trigger"
+                                            ? eventTypeParams
+                                            : rewardTypeParams
+                                        ).get(typeInfo.type) ?? []
+                                    }
+                                    onClose={() => setTypeInfo(null)}
                                 />
                             ) : null}
                         </div>
@@ -7831,34 +8221,6 @@ function App(): React.JSX.Element {
                         maxWidth={520}
                         header={
                             <>
-                                {mode === "edit" ? (
-                                    <IconButton
-                                        icon="save"
-                                        className={
-                                            "header-left" +
-                                            (pendingCount > 0 ? " active" : "")
-                                        }
-                                        title={l10n.t(
-                                            "Save - write all staged changes to the XML files",
-                                        )}
-                                        badge={
-                                            pendingCount > 0
-                                                ? ` ${pendingCount}`
-                                                : ""
-                                        }
-                                        disabled={pendingCount === 0 || saving}
-                                        disabledReason={
-                                            saving
-                                                ? l10n.t(
-                                                      "Save - writing the staged changes now",
-                                                  )
-                                                : l10n.t(
-                                                      "Save - nothing is staged",
-                                                  )
-                                        }
-                                        onClick={saveEdits}
-                                    />
-                                ) : null}
                                 <RotaryModeSwitch
                                     mode={mode}
                                     modes={STORY_MODES.filter((m) =>
@@ -7884,16 +8246,6 @@ function App(): React.JSX.Element {
                                         )}
                                     onSelect={switchMode}
                                 />
-                                <SeverityTag
-                                    severity={severity}
-                                    count={problems.length}
-                                    title={l10n.t(
-                                        "Validate - check the story for problems (opens the panel below)",
-                                    )}
-                                    onClick={() => {
-                                        validateEdits();
-                                    }}
-                                />
                             </>
                         }
                         content={
@@ -7902,6 +8254,18 @@ function App(): React.JSX.Element {
                                     <NodePalette
                                         eventTypes={eventTypes}
                                         rewardTypes={rewardTypes}
+                                        eventNames={{
+                                            mode: typeNames,
+                                            labels: eventTypeLabels,
+                                        }}
+                                        rewardNames={{
+                                            mode: typeNames,
+                                            labels: rewardTypeLabels,
+                                        }}
+                                        eventDocs={eventTypeDocs}
+                                        rewardDocs={rewardTypeDocs}
+                                        info={typeInfo}
+                                        onInfo={setTypeInfo}
                                     />
                                 ) : null}
                                 {mode === "simulate" && simState?.running ? (
@@ -7956,35 +8320,47 @@ function App(): React.JSX.Element {
                                         }}
                                     />
                                 ) : null}
-                                <div className="dock-search">
-                                    <div className="dock-section-title">
-                                        {l10n.t("Filter")}
-                                    </div>
-                                    <div className="search-field">
-                                        {/* The box shows what was typed at once; only the APPLIED filter waits -
-                                    each one costs a server request and a full rebuild (#131). */}
-                                        <input
-                                            type="text"
-                                            placeholder={l10n.t(
-                                                "Filter event names...",
-                                            )}
-                                            value={nameDraft}
-                                            onChange={(e) =>
-                                                setNameDraft(e.target.value)
-                                            }
-                                        />
-                                    </div>
-                                </div>
                                 <div className="overview-mid">
+                                    <Minimap
+                                        getHandle={() => editorRef.current}
+                                    />
+                                    {/* The canvas tools at the minimap's right: how close, how framed,
+                                    how laid out, and what is drawn behind the nodes. */}
                                     <div className="overview-tools">
-                                        {/* The draft, so the button wakes with the first letter rather than with
-                                    the fetch it is waiting on. */}
-                                        <ClearFiltersButton
-                                            filters={{
-                                                ...filters,
-                                                nameFilter: nameDraft,
+                                        <IconButton
+                                            icon="zoomIn"
+                                            title={l10n.t("Zoom in")}
+                                            onClick={() => {
+                                                const handle =
+                                                    editorRef.current;
+                                                handle?.zoomTo(
+                                                    stepZoom(
+                                                        handle.zoomLevel(),
+                                                        1,
+                                                    ),
+                                                );
                                             }}
-                                            onClear={clearFilters}
+                                        />
+                                        <IconButton
+                                            icon="zoomOut"
+                                            title={l10n.t("Zoom out")}
+                                            onClick={() => {
+                                                const handle =
+                                                    editorRef.current;
+                                                handle?.zoomTo(
+                                                    stepZoom(
+                                                        handle.zoomLevel(),
+                                                        -1,
+                                                    ),
+                                                );
+                                            }}
+                                        />
+                                        <IconButton
+                                            icon="frame"
+                                            title={l10n.t("Fit graph to view")}
+                                            onClick={() =>
+                                                editorRef.current?.fit()
+                                            }
                                         />
                                         <IconButton
                                             icon="arrange"
@@ -8014,13 +8390,6 @@ function App(): React.JSX.Element {
                                             title={l10n.t(
                                                 "Arrange - recompute the automatic layout",
                                             )}
-                                        />
-                                        <IconButton
-                                            icon="frame"
-                                            title={l10n.t("Fit graph to view")}
-                                            onClick={() =>
-                                                editorRef.current?.fit()
-                                            }
                                         />
                                         <IconButton
                                             icon="threadLanes"
@@ -8059,68 +8428,10 @@ function App(): React.JSX.Element {
                                             }
                                         />
                                     </div>
-                                    <Minimap
-                                        getHandle={() => editorRef.current}
-                                    />
                                 </div>
-                                <div className="filters-below">
-                                    <SelectField
-                                        value={filters.branch}
-                                        ariaLabel={l10n.t("Branch")}
-                                        title={l10n.t("Branch")}
-                                        icon="search"
-                                        options={[
-                                            {
-                                                value: "",
-                                                label: l10n.t("All branches"),
-                                            },
-                                            ...branches.map((b) => ({
-                                                value: b,
-                                            })),
-                                        ]}
-                                        onChange={(branch) =>
-                                            setFilter({ branch })
-                                        }
-                                    />
-                                    <SelectField
-                                        value={filters.lifecycle}
-                                        ariaLabel={l10n.t("Lifecycle")}
-                                        title={l10n.t("Lifecycle")}
-                                        icon="search"
-                                        options={[
-                                            {
-                                                value: "",
-                                                label: l10n.t("Any lifecycle"),
-                                            },
-                                            ...LIFECYCLES.map((l) => ({
-                                                value: l,
-                                            })),
-                                        ]}
-                                        onChange={(lifecycle) =>
-                                            setFilter({ lifecycle })
-                                        }
-                                    />
-                                    <SelectField
-                                        value={filters.plotState}
-                                        ariaLabel={l10n.t("Plot state")}
-                                        icon="search"
-                                        title={l10n.t(
-                                            "Plot state - how this faction's manifest registers the thread an event lives in",
-                                        )}
-                                        options={[
-                                            {
-                                                value: "",
-                                                label: l10n.t("Any plot state"),
-                                            },
-                                            ...PLOT_STATES.map((p) => ({
-                                                value: p,
-                                            })),
-                                        ]}
-                                        onChange={(plotState) =>
-                                            setFilter({ plotState })
-                                        }
-                                    />
-                                </div>
+                                <CanvasZoomSlider
+                                    getHandle={() => editorRef.current}
+                                />
                             </>
                         }
                     />
@@ -8243,6 +8554,31 @@ const STORY_MODES: RotaryMode<EditorMode>[] = [
 ];
 
 const MINIMAP_H = 118;
+
+/**
+ * The canvas's zoom in the dock's foot: the shared slider, by doublings from 1% to 200%, with the
+ * zoom in percent. It follows the canvas however it was zoomed - the wheel, the tools, a fit - through
+ * the same pan/zoom bridge the minimap reads.
+ */
+function CanvasZoomSlider(props: {
+    getHandle: () => EditorHandle | null;
+}): React.JSX.Element {
+    const [, force] = useReducer((x: number) => x + 1, 0);
+    useEffect(() => subscribeAreaChange(() => force()), []);
+    const handle = props.getHandle();
+
+    return (
+        <ZoomSlider
+            value={handle?.zoomLevel() ?? 1}
+            min={CANVAS_ZOOM_MIN}
+            max={CANVAS_ZOOM_MAX}
+            logarithmic
+            label={l10n.t("Zoom")}
+            title={l10n.t("Drag, or scroll over the graph")}
+            onZoom={(zoom) => handle?.zoomTo(zoom)}
+        />
+    );
+}
 
 /**
  * A hand-built overview of the whole graph (the rete minimap plugin can only overlay the canvas, not
@@ -8658,18 +8994,53 @@ function fadedBg(color: string): string {
 function NodePalette(props: {
     eventTypes: string[];
     rewardTypes: string[];
+    /** What each event type is called, and which of its two names its tile shows. */
+    eventNames: TypeNames;
+    /** The same for the rewards: a reward and an event may share a technical name. */
+    rewardNames: TypeNames;
+    /** What the schema says about each type, for the mark on its tile's info pill. */
+    eventDocs: ReadonlyMap<string, TypeDoc>;
+    rewardDocs: ReadonlyMap<string, TypeDoc>;
+    /** The type whose documentation is open beside the dock, and how a pill opens or closes it. */
+    info: TypeInfo | null;
+    onInfo: (info: TypeInfo | null) => void;
 }): React.JSX.Element {
     const [search, setSearch] = useState("");
+    // The search plate: how the pattern is read, whether its magnifier is pressed - which is
+    // whether the field shows, and nothing more - and which of the two kinds of type the palette
+    // shows. Both kinds on is the whole palette.
+    const [searchMode, setSearchMode] = useState<SearchMode>("text");
+    const [searchPressed, setSearchPressed] = useState(false);
+    const [kinds, setKinds] = useState<ReadonlySet<"trigger" | "reward">>(
+        new Set(["trigger", "reward"]),
+    );
+    const toggleKind = (kind: "trigger" | "reward"): void =>
+        setKinds((current) => {
+            const next = new Set(current);
+            if (!next.delete(kind)) {
+                next.add(kind);
+            }
+            return next;
+        });
     // Collapse state per collapsible group; Rewards starts collapsed (it's the long one).
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
         Rewards: true,
     });
-    const q = search.trim().toLowerCase();
-    const matches = (name: string): boolean =>
-        q === "" || name.toLowerCase().includes(q);
 
-    const eventTypes = props.eventTypes.filter(matches);
-    const rewardTypes = props.rewardTypes.filter(matches);
+    // The documentation flyout belongs to a tile here. When the palette goes - the mode changes,
+    // the dock folds - there is no pill left for it to point at, so it goes too.
+    const { onInfo } = props;
+    useEffect(() => () => onInfo(null), [onInfo]);
+    const q = search.trim();
+
+    // By either name, whichever the tiles show: a type is found by what it is called in XML and
+    // by what it is called in words. The pattern is read in the plate's mode.
+    const eventTypes = props.eventTypes.filter((type) =>
+        matchesType(props.eventNames, type, q, searchMode),
+    );
+    const rewardTypes = props.rewardTypes.filter((type) =>
+        matchesType(props.rewardNames, type, q, searchMode),
+    );
     // The structural actions (New event / AND / OR) always stay - the search only filters the types.
     const showBlank = true;
     const showAndJunction = true;
@@ -8683,14 +9054,16 @@ function NodePalette(props: {
         e.dataTransfer.effectAllowed = "copy";
     };
 
-    // The whole tile is washed in its family colour - no glyph (they were all identical). Structural
-    // tiles (New/AND/OR) keep a distinguishing glyph since their shapes actually differ.
+    // The whole tile is washed in its family colour, which says which family a type is in. An
+    // event's glyph says what the type itself is - see eventIcons.ts. Rewards carry none yet.
+    // Structural tiles (New/AND/OR) keep a distinguishing glyph since their shapes differ.
     const tile = (
         key: string,
         glyph: React.JSX.Element | null,
-        label: string,
+        label: React.ReactNode,
         drag: PaletteDrag,
-        hint: string,
+        title: string,
+        corner: React.JSX.Element | null = null,
     ): React.JSX.Element => {
         const color = stepColor(drag.category, drag.type);
         return (
@@ -8698,13 +9071,88 @@ function NodePalette(props: {
                 key={key}
                 className="dock-tile palette-tile"
                 draggable
+                data-category={drag.category}
+                data-type={drag.type ?? undefined}
                 style={{ background: fadedBg(color), borderColor: color }}
                 onDragStart={(e) => onDragStart(e, drag)}
-                title={`${label}\n${hint}`}
+                title={title}
             >
                 {glyph ? <span className="tile-glyph">{glyph}</span> : null}
                 <span className="tile-label">{label}</span>
+                {corner}
             </div>
+        );
+    };
+
+    /** A structural tile's tooltip: what it is, then what dragging it does. */
+    const structural = (label: string, hint: string): string =>
+        `${label}\n${hint}`;
+
+    /**
+     * The tile of one event or reward type: the name the reader asked for, the other name and the
+     * hint in its tooltip. A technical name is cut where it may break, after each underscore -
+     * a browser breaks a line at a space only, and a name left whole is cut mid-word.
+     */
+    const typeTile = (
+        category: "trigger" | "reward",
+        type: string,
+        hint: string,
+    ): React.JSX.Element => {
+        const names =
+            category === "trigger" ? props.eventNames : props.rewardNames;
+        const shown = tileName(names, type, q, searchMode);
+        const other = otherName(names, type, q, searchMode);
+
+        // The info pill: the documentation is one press away, and the pill is the tile's only
+        // mark - its severity is the worst thing the schema notes about the type. A press on it
+        // must not start a drag of the tile it sits on, so the pill refuses the drag itself.
+        const notes = (
+            category === "trigger" ? props.eventDocs : props.rewardDocs
+        ).get(type)?.notes;
+        const severity = pillSeverity(notes);
+        const open =
+            props.info?.category === category && props.info.type === type;
+        const pill = (
+            <button
+                type="button"
+                className={
+                    `info-badge tile-info sev-${severity}` +
+                    (open ? " active" : "")
+                }
+                draggable
+                onDragStart={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }}
+                aria-expanded={open}
+                aria-label={l10n.t("Documentation")}
+                title={
+                    severity === "info" || notes === undefined
+                        ? l10n.t("Documentation")
+                        : noteLine(notes[0])
+                }
+                onClick={(e) => {
+                    e.stopPropagation();
+                    props.onInfo(open ? null : { category, type });
+                }}
+            >
+                <Icon name={badgeIcon(severity)} size={14} />
+            </button>
+        );
+        return tile(
+            type,
+            category === "trigger" ? <Icon name={eventIcon(type)} /> : null,
+            shown.technical
+                ? breakPieces(shown.text).map((piece, at) => (
+                      <Fragment key={at}>
+                          {at > 0 ? <wbr /> : null}
+                          {piece}
+                      </Fragment>
+                  ))
+                : shown.text,
+            { category, type },
+            [shown.text, other, hint].filter(Boolean).join("\n"),
+            pill,
         );
     };
 
@@ -8716,9 +9164,10 @@ function NodePalette(props: {
         label: string,
         category: "trigger" | "reward",
         items: string[],
+        total: number,
         hint: string,
     ): React.JSX.Element | null => {
-        if (!items.length) {
+        if (!items.length || !kinds.has(category)) {
             return null;
         }
         const isCollapsed = q === "" && collapsed[label];
@@ -8736,37 +9185,41 @@ function NodePalette(props: {
             <DockSection
                 id={label}
                 title={label}
-                count={items.length}
+                // A narrowed list says so: "3" over the events reads as a schema with three.
+                count={
+                    items.length === total
+                        ? total
+                        : l10n.t("{0} of {1}", items.length, total)
+                }
                 collapsed={isCollapsed}
                 onToggle={() =>
                     setCollapsed((c) => ({ ...c, [label]: !c[label] }))
                 }
             >
-                {[...families.entries()].map(([color, names]) => (
-                    <div key={color} className="tile-family">
-                        <div className="tile-grid">
-                            {names.map((t) =>
-                                tile(t, null, t, { category, type: t }, hint),
-                            )}
+                <div className="palette-types">
+                    {[...families.entries()].map(([color, names]) => (
+                        <div key={color} className="tile-family">
+                            <div className="tile-grid">
+                                {names.map((t) => typeTile(category, t, hint))}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </DockSection>
         );
     };
 
     return (
-        <div className="palette-scroll">
-            <div className="dock-search">
-                <div className="search-field">
-                    <input
-                        type="text"
-                        placeholder={l10n.t("Search node types...")}
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                </div>
-            </div>
+        // The class says which name the type tiles show: a technical name runs to three lines
+        // where a display name fits two, so every row of the palette is taller with it.
+        <div
+            className={
+                "palette-scroll" +
+                (props.eventNames.mode === "technical"
+                    ? " technical-names"
+                    : "")
+            }
+        >
             {showBlank || showAndJunction || showOrJunction ? (
                 <div className="dock-section palette-new">
                     <div className="tile-grid">
@@ -8776,8 +9229,11 @@ function NodePalette(props: {
                                   <Icon name="add" />,
                                   l10n.t("New event"),
                                   { category: "blank", type: null },
-                                  l10n.t(
-                                      "Drag onto the canvas to create a new untyped event, then edit it in place",
+                                  structural(
+                                      l10n.t("New event"),
+                                      l10n.t(
+                                          "Drag onto the canvas to create a new untyped event, then edit it in place",
+                                      ),
                                   ),
                               )
                             : null}
@@ -8787,8 +9243,11 @@ function NodePalette(props: {
                                   <span className="junction-glyph shape-circle" />,
                                   "AND",
                                   { category: "andJunction", type: null },
-                                  l10n.t(
-                                      "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that should require all of them together",
+                                  structural(
+                                      "AND",
+                                      l10n.t(
+                                          "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that should require all of them together",
+                                      ),
                                   ),
                               )
                             : null}
@@ -8798,8 +9257,11 @@ function NodePalette(props: {
                                   <span className="junction-glyph shape-diamond" />,
                                   "OR",
                                   { category: "orJunction", type: null },
-                                  l10n.t(
-                                      "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that any one of them should arm",
+                                  structural(
+                                      "OR",
+                                      l10n.t(
+                                          "Drag onto the canvas, wire event outputs into it, then drag its output onto the event that any one of them should arm",
+                                      ),
                                   ),
                               )
                             : null}
@@ -8810,12 +9272,14 @@ function NodePalette(props: {
                 l10n.t("Event types"),
                 "trigger",
                 eventTypes,
+                props.eventTypes.length,
                 l10n.t("Drag onto the canvas to create an event"),
             )}
             {typeGroup(
                 l10n.t("Rewards"),
                 "reward",
                 rewardTypes,
+                props.rewardTypes.length,
                 l10n.t("Drag onto an event node to attach this reward to it"),
             )}
             {q !== "" && !eventTypes.length && !rewardTypes.length ? (
@@ -8823,6 +9287,51 @@ function NodePalette(props: {
                     {l10n.t('No node types match "{0}".', search)}
                 </p>
             ) : null}
+            {kinds.size === 0 ? (
+                <p className="palette-empty">
+                    {l10n.t("Nothing matches that filter.")}
+                </p>
+            ) : null}
+
+            {/* The search, in the model tree's shape: a plate at the foot of the palette with the
+                magnifier, the two kinds and the filter icon, whose field opens to the left of
+                icons that never move - beside the plate, over the canvas. Last in the scroller, so
+                it stays on the dock's bottom edge while the tiles move under it. It finds a type
+                by either of its names. A kind switched off is a filter like a pattern is, and the
+                reset puts both back. */}
+            <SearchPlate
+                open={searchPressed}
+                pattern={search}
+                mode={searchMode}
+                filtered={search !== "" || kinds.size < 2}
+                error={compileMatcher(q, searchMode).error}
+                placeholder={l10n.t("Search by either name")}
+                title={l10n.t("Search the node types")}
+                onPattern={setSearch}
+                onMode={setSearchMode}
+                onOpen={setSearchPressed}
+                onReset={() => {
+                    setSearch("");
+                    setKinds(new Set(["trigger", "reward"]));
+                }}
+                variant="sticky"
+                beside
+            >
+                <IconButton
+                    icon="trigger"
+                    className={kinds.has("trigger") ? "active" : undefined}
+                    pressed={kinds.has("trigger")}
+                    title={l10n.t("Show event types")}
+                    onClick={() => toggleKind("trigger")}
+                />
+                <IconButton
+                    icon="reward"
+                    className={kinds.has("reward") ? "active" : undefined}
+                    pressed={kinds.has("reward")}
+                    title={l10n.t("Show rewards")}
+                    onClick={() => toggleKind("reward")}
+                />
+            </SearchPlate>
         </div>
     );
 }

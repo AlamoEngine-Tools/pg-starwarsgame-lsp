@@ -183,6 +183,7 @@ public sealed class SchemaIndex
         {
             Name = rawVal.Name,
             Value = rawVal.Value,
+            Label = rawVal.Label,
             Description = rawVal.Description,
             Notes = rawVal.Notes,
             Groups = rawVal.Groups,

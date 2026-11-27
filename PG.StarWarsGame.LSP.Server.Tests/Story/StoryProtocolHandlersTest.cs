@@ -267,6 +267,29 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal(["Start"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
     }
 
+    // The search plate reads a pattern three ways, and the graph's event filter is answered here
+    // rather than in the webview - so the three ways have to hold on the server, the same as the
+    // lists that match in the webview.
+    [Theory]
+    [InlineData(null, "n?xt", new string[0])]
+    [InlineData("text", "n?xt", new string[0])]
+    [InlineData("wildcard", "n?xt", new[] { "Next" })]
+    [InlineData("wildcard", "l*r", new[] { "Later" })]
+    [InlineData("regex", "^(start|next)$", new[] { "Start", "Next" })]
+    // Half-typed most of the time it is used: a pattern that does not compile finds nothing and
+    // does not fail the request.
+    [InlineData("regex", "(", new string[0])]
+    public async Task GetStoryGraph_NameFilter_ReadsThePatternInItsMode(
+        string? mode, string pattern, string[] expected)
+    {
+        var result = await new GetStoryGraphHandler(Models(), TestCatalogues.English, new StubProjects(null))
+            .Handle(new GetStoryGraphParams("GC", "Rebel", pattern, NameFilterMode: mode),
+                TestContext.Current.CancellationToken);
+
+        Assert.Null(result.Error);
+        Assert.Equal(expected.Order(), result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).Order());
+    }
+
     [Fact]
     public async Task GetStoryGraph_BranchFilter_KeepsBranchMembers()
     {
@@ -507,6 +530,9 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal("Event", param.Label);
         var enter = Assert.Single(result.EventTypes, t => t.Name == "STORY_ENTER");
         Assert.Null(Assert.Single(enter.Params).Label);
+        // The type's own display name travels the same way: what the schema gives, or null.
+        Assert.Equal("Time elapsed", Assert.Single(result.EventTypes, t => t.Name == "STORY_ELAPSED").Label);
+        Assert.Null(enter.Label);
         // Notes travel whole rather than as one boolean: the editor has to tell an untested type
         // from one the engine ignores, and until 2.0.0 the wire could only say "untested".
         var untested = Assert.Single(
@@ -868,7 +894,11 @@ public sealed class StoryProtocolHandlersTest
             Name = "StoryEventType",
             Values =
             [
-                new EnumValueDefinition { Name = "STORY_ELAPSED" },
+                new EnumValueDefinition
+                {
+                    Name = "STORY_ELAPSED",
+                    Label = new Dictionary<string, string> { ["en"] = "Time elapsed" }
+                },
                 new EnumValueDefinition { Name = "STORY_TRIGGER" },
                 new EnumValueDefinition
                 {

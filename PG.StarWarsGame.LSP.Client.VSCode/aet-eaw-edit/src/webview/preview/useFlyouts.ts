@@ -12,7 +12,7 @@ import {
     useRef,
     useState,
 } from "react";
-import { anchorFlyout } from "./flyoutAnchor";
+import { anchorFlyout, type AnchorPlacement } from "../shared/flyoutAnchor";
 
 /** What useFlyouts reads from the rest of the preview. */
 export interface FlyoutsInputs {
@@ -48,33 +48,35 @@ export function useFlyouts({
     const abilitiesRef = useRef<HTMLDivElement | null>(null);
     const attackRef = useRef<HTMLDivElement | null>(null);
 
+    /* The pill that opens each stage flyout. A flyout opens at its pill, so it has to be told
+       which one that is - the pills are on the stage's rows, the flyouts beside them. */
+    const worldPillRef = useRef<HTMLButtonElement | null>(null);
+    const cameraPillRef = useRef<HTMLButtonElement | null>(null);
+    const abilitiesPillRef = useRef<HTMLButtonElement | null>(null);
+    const attackPillRef = useRef<HTMLButtonElement | null>(null);
+
     /** Whether the model's identity flyout is showing. Closed on open - it is a check, not a tool. */
     const [infoOpen, setInfoOpen] = useState(false);
     const infoRef = useRef<HTMLDivElement | null>(null);
 
-    /* Whether the reader has pressed the tree's magnifier. NOT whether the box is showing - see
-       `searchIsOpen`, which keeps it open while a pattern would otherwise be hidden behind it. */
+    /* Whether the reader has pressed the tree's magnifier, which is whether its field is showing.
+       The plate folds an empty field away on an outside press by itself. */
     const [searchPressed, setSearchPressed] = useState(false);
 
     /* Which hardpoint card has its measurements open. One at a time: two of them open turns the
        list back into the wall of prose that putting them behind a button was meant to end. */
     const [infoCard, setInfoCard] = useState<string | null>(null);
     const cardInfoRef = useRef<HTMLDivElement | null>(null);
-    const [cardInfoAt, setCardInfoAt] = useState<{
-        left: number;
-        top: number;
-    } | null>(null);
+    const [cardInfoAt, setCardInfoAt] = useState<AnchorPlacement | null>(null);
 
     /* The same, for an ability card. Its own slot rather than sharing `infoCard`: the two lists are
        open at once - the abilities are a stage flyout - and one id could not say which was meant. */
     const [infoAbility, setInfoAbility] = useState<string | null>(null);
     const abilityInfoRef = useRef<HTMLDivElement | null>(null);
-    const [abilityInfoAt, setAbilityInfoAt] = useState<{
-        left: number;
-        top: number;
-    } | null>(null);
+    const [abilityInfoAt, setAbilityInfoAt] = useState<AnchorPlacement | null>(
+        null,
+    );
     const [hardpointSearchPressed, setHardpointSearchPressed] = useState(false);
-    const hardpointSearchRef = useRef<HTMLDivElement | null>(null);
 
     /**
      * The scene flyout's box.
@@ -85,50 +87,11 @@ export function useFlyouts({
      */
     const worldRef = useRef<HTMLDivElement | null>(null);
 
-    /**
-     * The tree's search element, for the click-outside that folds it away again.
-     *
-     * Unlike the stage flyouts above, an outside click DOES close this one: it is a control you
-     * open, type in and leave, not a set of dials you work while watching the model. It closes only
-     * when empty, though - `searchIsOpen` would reopen it on the next render otherwise, and the
-     * press would read as a control that does nothing.
-     */
-    const searchRef = useRef<HTMLDivElement | null>(null);
-
-    useEffect(() => {
-        if (!hardpointSearchPressed) {
-            return;
-        }
-
-        const onDown = (event: MouseEvent): void => {
-            if (!hardpointSearchRef.current?.contains(event.target as Node)) {
-                setHardpointSearchPressed(false);
-            }
-        };
-
-        document.addEventListener("mousedown", onDown);
-        return () => document.removeEventListener("mousedown", onDown);
-    }, [hardpointSearchPressed]);
-
-    useEffect(() => {
-        if (!searchPressed) {
-            return;
-        }
-
-        const onDown = (event: MouseEvent): void => {
-            if (!searchRef.current?.contains(event.target as Node)) {
-                setSearchPressed(false);
-            }
-        };
-
-        document.addEventListener("mousedown", onDown);
-        return () => document.removeEventListener("mousedown", onDown);
-    }, [searchPressed]);
-
     // Both stage flyouts, one rule. Escape closes both; an outside click deliberately closes
     // neither - see above. They can be open TOGETHER on purpose: setting up a shot means moving the
     // light and the camera against each other, and a panel that shuts the other one turns that into
-    // a trip back to the button every time. Opposite corners, so they never overlap.
+    // a trip back to the button every time. Their pills are at opposite ends of the top edge, so
+    // on a stage wide enough for both they do not overlap.
     useEffect(() => {
         if (!worldOpen && !cameraOpen && !abilitiesOpen && !attackOpen) {
             return;
@@ -238,10 +201,7 @@ export function useFlyouts({
      * second thing to keep in step with `anchorFlyout`.
      */
     const placeBesideRow = useCallback(
-        (
-            selector: string,
-            box: HTMLElement | null,
-        ): { left: number; top: number } | null => {
+        (selector: string, box: HTMLElement | null): AnchorPlacement | null => {
             const button = document.querySelector(selector);
             const dock = document.querySelector(".right-dock");
 
@@ -342,6 +302,10 @@ export function useFlyouts({
         cameraRef,
         abilitiesRef,
         attackRef,
+        worldPillRef,
+        cameraPillRef,
+        abilitiesPillRef,
+        attackPillRef,
         infoOpen,
         setInfoOpen,
         infoRef,
@@ -357,8 +321,6 @@ export function useFlyouts({
         abilityInfoAt,
         hardpointSearchPressed,
         setHardpointSearchPressed,
-        hardpointSearchRef,
         worldRef,
-        searchRef,
     };
 }

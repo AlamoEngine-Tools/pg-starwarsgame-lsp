@@ -44,12 +44,15 @@ import {
     IconCheck,
     IconChevronDown,
     IconChevronRight,
+    IconChevronUp,
+    IconRestore,
     IconCircleDot,
     IconCircleOff,
     IconCircleX,
     IconClipboardCopy,
     IconCloudDownload,
     IconCoins,
+    IconColumns,
     IconCopy,
     IconCrosshair,
     IconCube,
@@ -68,6 +71,7 @@ import {
     IconFlag,
     IconFlame,
     IconGauge,
+    IconGitBranch,
     IconGift,
     IconGridDots,
     IconHandClick,
@@ -79,7 +83,6 @@ import {
     IconInfoCircle,
     IconLayersUnion,
     IconLayoutGrid,
-    IconLetterCase,
     IconLink,
     IconListDetails,
     IconListTree,
@@ -106,10 +109,10 @@ import {
     IconPoint,
     IconPlus,
     IconPolygon,
+    IconProgressCheck,
     type IconProps,
     IconRadar,
     IconRefresh,
-    IconRegex,
     IconRepeat,
     IconRoute,
     IconRuler,
@@ -122,6 +125,7 @@ import {
     IconShadow,
     IconSparkles,
     IconStack2,
+    IconStackBack,
     IconStairsUp,
     IconSun,
     IconSunHigh,
@@ -142,6 +146,50 @@ import {
     IconWind,
     IconWorld,
     IconX,
+    IconAlarm,
+    IconArrowBounce,
+    IconArrowsMove,
+    IconBan,
+    IconBiohazard,
+    IconBomb,
+    IconBuildingCastle,
+    IconBuildingSkyscraper,
+    IconCircleCheck,
+    IconClick,
+    IconClock,
+    IconCrown,
+    IconCurrentLocation,
+    IconDoorEnter,
+    IconFlag2,
+    IconFlag3,
+    IconHammer,
+    IconHomeOff,
+    IconHomeX,
+    IconHourglass,
+    IconLasso,
+    IconListCheck,
+    IconLogin2,
+    IconLogout,
+    IconMap,
+    IconMapPin,
+    IconMeteor,
+    IconMoodSad,
+    IconMountain,
+    IconParachute,
+    IconPlaneArrival,
+    IconPointer,
+    IconRocket,
+    IconShield,
+    IconShieldX,
+    IconShoppingCart,
+    IconSpy,
+    IconThumbDown,
+    IconThumbUp,
+    IconTrophy,
+    IconUserPlus,
+    IconUserX,
+    IconZoomIn,
+    IconZoomOut,
 } from "@tabler/icons-react";
 import { type ComponentType } from "react";
 
@@ -296,6 +344,14 @@ const ICONS = {
     reveal: IconFolderOpen,
     expanded: IconChevronDown,
     collapsed: IconChevronRight,
+    // A band that folds away upwards and opens downwards - the dock's header. The chevron points
+    // the way pressing it moves the band, which is not what `expanded` and `collapsed` say: those
+    // mark a row whose content sits below it.
+    foldUp: IconChevronUp,
+    unfoldDown: IconChevronDown,
+    // The subject put back the way it loaded. A clock wound back rather than the undo arrow, which
+    // is `reset` and takes back one thing.
+    sceneReset: IconRestore,
     /** A list to pick from, opening whichever way it finds room. The mark on a PillSelect. */
     picker: IconSelector,
 
@@ -319,11 +375,16 @@ const ICONS = {
     threadLanes: IconListTree,
     chapterLanes: IconBook,
 
-    // The find widget's three modes. Listed here so the whole set can be read in one place, but
-    // `CODICONS` below routes all three to the editor's own marks - see the note there.
-    searchLiteral: IconLetterCase,
-    searchWildcard: IconAsterisk,
-    searchRegex: IconRegex,
+    // Which column a search reads its pattern in. The three ways of reading the pattern are not
+    // icons: the search plate writes them out as the characters they mean.
+    searchScope: IconColumns,
+    // Entries that only repeat the layer below this file - the localisation search's quick filter.
+    layerBelow: IconStackBack,
+    // The story graph's three dropdown filters: a branch of the story, an event's lifecycle, and
+    // whether the faction's manifest runs a plot or holds it suspended.
+    branch: IconGitBranch,
+    lifecycle: IconProgressCheck,
+    plotState: IconPlayerPause,
 
     // ── the story simulation ──────────────────────────────────────────────────
     // What the running story is waiting on the AUTHOR for: a hand on a control, because every
@@ -412,6 +473,59 @@ const ICONS = {
     behaviour: IconActivity,
     // One value of an enum.
     enumValue: IconPoint,
+    // What a story event type is, on its tile in the story graph's palette: one glyph per kind
+    // of thing that happened. Events that are one thing under two names share one. The events
+    // that are about a planet, a flag, credits, speech or a script take the story's own marks
+    // above - see storyGraph/eventIcons.ts for which type takes which.
+    baseLost: IconHomeX,
+    era: IconHourglass,
+    purchase: IconShoppingCart,
+    heroCaptured: IconLasso,
+    structure: IconBuildingCastle,
+    allDestroyed: IconListCheck,
+    click: IconClick,
+    command: IconPointer,
+    planetControl: IconFlag2,
+    conquests: IconFlag3,
+    construct: IconHammer,
+    baseLevel: IconBuildingSkyscraper,
+    corruption: IconBiohazard,
+    missionComplete: IconCircleCheck,
+    missionFailed: IconCircleX,
+    heroDefeated: IconUserX,
+    deploy: IconParachute,
+    destroyed: IconBomb,
+    baseDestroyed: IconHomeOff,
+    difficulty: IconAdjustments,
+    elapsed: IconClock,
+    orbitEntered: IconLogin2,
+    bounced: IconArrowBounce,
+    positionRevealed: IconMapPin,
+    sabotage: IconSpy,
+    garrison: IconDoorEnter,
+    genericEvent: IconAsterisk,
+    guard: IconShield,
+    invasionBounced: IconShieldX,
+    landed: IconPlaneArrival,
+    landBattle: IconMountain,
+    battleStarted: IconMap,
+    battlesLost: IconThumbDown,
+    missionLost: IconMoodSad,
+    heroMoved: IconArrowsMove,
+    noEvent: IconBan,
+    objectiveTimeout: IconAlarm,
+    menuOpened: IconFolderOpen,
+    planetDestroyed: IconMeteor,
+    politicalControl: IconCrown,
+    reinforced: IconUserPlus,
+    retreated: IconLogout,
+    spaceBattle: IconRocket,
+    arrived: IconCurrentLocation,
+    proximity: IconRadar,
+    victory: IconTrophy,
+    battlesWon: IconThumbUp,
+    zoomIn: IconZoomIn,
+    zoomOut: IconZoomOut,
 } satisfies Record<string, ComponentType<IconProps>>;
 
 export type IconName = keyof typeof ICONS;
@@ -430,14 +544,6 @@ export type IconName = keyof typeof ICONS;
 /** Meanings that keep the editor's glyph rather than taking Tabler's. */
 const CODICONS = {
     definition: "go-to-file",
-
-    // The find widget's three search modes, and the same argument again. A reader recognises Aa,
-    // the star and .* from the editor's own search box - they are not descriptions of anything,
-    // they are learned marks - so redrawing them in another set would make a control someone
-    // already knows look like a new one. Tabler entries exist for all three; this routes past them.
-    searchLiteral: "case-sensitive",
-    searchWildcard: "star-full",
-    searchRegex: "regex",
 } as const satisfies Partial<Record<IconName, string>>;
 
 type CodiconMeaning = keyof typeof CODICONS;

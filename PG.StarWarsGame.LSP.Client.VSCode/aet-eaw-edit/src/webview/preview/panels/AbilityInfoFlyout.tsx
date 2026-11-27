@@ -5,13 +5,13 @@
 
 import type { Dispatch, SetStateAction, RefObject } from "react";
 import type { Abilities } from "../useAbilities";
-import * as l10n from "@vscode/l10n";
 import { Fragment } from "react";
-import { IconButton } from "../../shared/Button";
+import { DetailsFlyout } from "../../shared/DetailsFlyout";
+import type { AnchorPlacement } from "../../shared/flyoutAnchor";
 import { abilityFacts } from "../abilityRows";
 
 export interface AbilityInfoFlyoutProps {
-    abilityInfoAt: { left: number; top: number } | null;
+    abilityInfoAt: AnchorPlacement | null;
     abilityInfoRef: RefObject<HTMLDivElement | null>;
     abilityState: Abilities;
     infoAbility: string;
@@ -26,44 +26,25 @@ export function AbilityInfoFlyout({
     setInfoAbility,
 }: AbilityInfoFlyoutProps): React.JSX.Element {
     return (
-        <div
-            className="details-flyout"
-            role="dialog"
-            ref={abilityInfoRef}
-            style={
-                abilityInfoAt === null
-                    ? { visibility: "hidden" }
-                    : {
-                          left: abilityInfoAt.left,
-                          top: abilityInfoAt.top,
-                      }
+        <DetailsFlyout
+            title={
+                abilityState.abilities.find((a) => a.type === infoAbility)
+                    ?.label ?? infoAbility
             }
+            at={abilityInfoAt}
+            ref={abilityInfoRef}
+            onClose={() => setInfoAbility(null)}
         >
-            <div className="details-head">
-                <span className="details-title">
-                    {abilityState.abilities.find((a) => a.type === infoAbility)
-                        ?.label ?? infoAbility}
-                </span>
-                <IconButton
-                    icon="close"
-                    title={l10n.t("Close")}
-                    onClick={() => setInfoAbility(null)}
-                />
-            </div>
-            <div className="details-body">
-                <dl className="card-info">
-                    {abilityFacts(
-                        abilityState.abilities.find(
-                            (a) => a.type === infoAbility,
-                        )!,
-                    ).map(([label, value]) => (
-                        <Fragment key={label}>
-                            <dt>{label}</dt>
-                            <dd>{value}</dd>
-                        </Fragment>
-                    ))}
-                </dl>
-            </div>
-        </div>
+            <dl className="card-info">
+                {abilityFacts(
+                    abilityState.abilities.find((a) => a.type === infoAbility)!,
+                ).map(([label, value]) => (
+                    <Fragment key={label}>
+                        <dt>{label}</dt>
+                        <dd>{value}</dd>
+                    </Fragment>
+                ))}
+            </dl>
+        </DetailsFlyout>
     );
 }

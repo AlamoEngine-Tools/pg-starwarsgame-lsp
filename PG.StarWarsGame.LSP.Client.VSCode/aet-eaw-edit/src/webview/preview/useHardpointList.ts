@@ -12,7 +12,7 @@ import {
     type SetStateAction,
 } from "react";
 import { groupHardpoints, groupOf } from "./hardpointGroups";
-import { searchIsOpen } from "./treeSearch";
+import { compileMatcher, type SearchMode } from "../shared/searchPattern";
 import { type HardpointCard } from "./hardpointCards";
 import { type WeaponRow } from "./weaponRows";
 
@@ -42,20 +42,25 @@ export function useHardpointList({
         new Set(),
     );
 
-    /* The hardpoint list's own filter, in the tree's shape - see `searchIsOpen` for why a pattern
-       keeps its own box open whatever the button was left saying. */
+    /* The hardpoint list's own filter, in the tree's shape: the field shows while the magnifier is
+       pressed, and closing it leaves the pattern in force. */
     const [hardpointFilter, setHardpointFilter] = useState("");
+    const [hardpointFilterMode, setHardpointFilterMode] =
+        useState<SearchMode>("text");
 
-    const hardpointSearchOpen = searchIsOpen(
-        hardpointSearchPressed,
-        hardpointFilter,
-    );
+    const hardpointSearchOpen = hardpointSearchPressed;
+
+    /* Why the pattern will not compile, for the field. Only a regular expression can fail. */
+    const hardpointFilterError = compileMatcher(
+        hardpointFilter.trim(),
+        hardpointFilterMode,
+    ).error;
 
     /* Gathered by type, and narrowed by the filter. A Star Destroyer's eight laser hardpoints are
        eight cards that differ only by which corner they sit on. */
     const hardpointGroups = useMemo(
-        () => groupHardpoints(cards, hardpointFilter),
-        [cards, hardpointFilter],
+        () => groupHardpoints(cards, hardpointFilter, hardpointFilterMode),
+        [cards, hardpointFilter, hardpointFilterMode],
     );
 
     /* A flyout is anchored to a card, so it cannot outlive the card being on screen - filtering it
@@ -123,6 +128,9 @@ export function useHardpointList({
         setFoldedGroups,
         hardpointFilter,
         setHardpointFilter,
+        hardpointFilterMode,
+        setHardpointFilterMode,
+        hardpointFilterError,
         hardpointSearchOpen,
         hardpointGroups,
     };

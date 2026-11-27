@@ -10,6 +10,7 @@ internal sealed record RawEnumValueDefinition
 {
     public required string Name { get; init; }
     public string? Value { get; init; }
+    public IReadOnlyDictionary<string, string> Label { get; init; } = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
     public IReadOnlyList<SchemaNote> Notes { get; init; } = [];
     public IReadOnlyList<string> Groups { get; init; } = [];

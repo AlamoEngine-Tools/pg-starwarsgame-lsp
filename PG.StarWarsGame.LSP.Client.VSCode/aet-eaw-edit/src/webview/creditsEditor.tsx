@@ -36,7 +36,7 @@ import { ConvertibleFormat, LocDockActions } from "./loc/LocDockActions";
 import { LocGridMessage, LocGridShell } from "./loc/LocGridShell";
 import { EditMenuItem, useReadOnly } from "./loc/readOnly";
 import { LocColumnMenu } from "./loc/LocColumnMenu";
-import { LocDockHeader } from "./loc/LocDockHeader";
+import { LocDockHeader, LocPageToolbar } from "./loc/LocDockHeader";
 import { useLocColumns } from "./loc/useLocColumns";
 import { creditsBaselineValues } from "./loc/creditsBaselineFill";
 import {
@@ -47,7 +47,7 @@ import {
 import { BaselineRow, toBaselineRows } from "./translationInherited";
 import { languageCopyValues } from "./loc/languageCopy";
 import { LocTile, LocTileGrid } from "./loc/LocTile";
-import { LocSearch } from "./loc/LocSearch";
+import { LocSearchPlate } from "./loc/LocSearchPlate";
 import { LocProblemsBar } from "./loc/LocProblemsBar";
 import { LocRow } from "./loc/locRow";
 import { rowSeverityClass, severityByRow } from "./loc/rowSeverity";
@@ -165,6 +165,7 @@ function App(): React.JSX.Element {
         validation,
         stage,
         save,
+        discard,
         validate,
     } = panel;
 
@@ -552,15 +553,17 @@ function App(): React.JSX.Element {
             </>
         );
 
-    const dockHeader = (
-        <LocDockHeader
+    const toolbar = (
+        <LocPageToolbar
             queue={queue}
             problems={problems}
             validation={validation}
             onSave={save}
+            onDiscard={discard}
             onValidate={validate}
         />
     );
+    const dockHeader = <LocDockHeader />;
 
     const dockContent = (
         <>
@@ -715,8 +718,8 @@ function App(): React.JSX.Element {
         </>
     );
 
-    const dockOverview = (
-        <LocSearch
+    const searchPlate = (
+        <LocSearchPlate
             filter={filter}
             onFilter={setFilter}
             mode={mode}
@@ -786,9 +789,10 @@ function App(): React.JSX.Element {
                 e.preventDefault();
                 setMenu({ x: e.clientX, y: e.clientY, index: rows.length - 1 });
             }}
+            toolbar={toolbar}
             dockHeader={dockHeader}
             dockContent={dockContent}
-            dockOverview={dockOverview}
+            searchPlate={searchPlate}
         />
     );
 }

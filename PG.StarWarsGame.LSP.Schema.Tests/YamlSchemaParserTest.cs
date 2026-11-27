@@ -812,6 +812,28 @@ public sealed class YamlSchemaParserTest
         Assert.Empty(p2.Label);
     }
 
+    // A value's display name, beside its description: what the story graph's palette shows on a
+    // tile. A value without one has none - the reader of the schema decides what to show instead.
+    [Fact]
+    public void ParseEnumFile_ReadsAValuesLabel_AndLeavesAValueWithoutOneEmpty()
+    {
+        const string yaml = """
+                            name: StoryEventType
+                            values:
+                              - name: STORY_ELAPSED
+                                label:
+                                  en: "Time elapsed"
+                                description:
+                                  en: "Fires after the specified number of seconds have elapsed."
+                              - name: STORY_TRIGGER
+                            """;
+
+        var def = YamlSchemaParser.ParseEnumFile(yaml);
+
+        Assert.Equal("Time elapsed", def.Values.Single(v => v.Name == "STORY_ELAPSED").Label["en"]);
+        Assert.Empty(def.Values.Single(v => v.Name == "STORY_TRIGGER").Label);
+    }
+
     [Fact]
     public void ParseEnumFile_WithoutParams_ReturnsNullParams()
     {

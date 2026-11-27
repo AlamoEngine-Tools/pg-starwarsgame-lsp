@@ -34,7 +34,7 @@ internal static class StoryGraphProjection
     private const string Both = "Both";
 
     /// <param name="model">The assembled campaign.</param>
-    /// <param name="nameFilter">Text an event's label must contain, or null for every event.</param>
+    /// <param name="nameFilter">A pattern an event's label must answer, or null for every event.</param>
     /// <param name="branch">The branch an event must belong to, or null for every branch.</param>
     /// <param name="lifecycle">The lifecycle an event must be in, or null for every lifecycle.</param>
     /// <param name="reachableFrom">The event the reachability filter is anchored on, or null for none.</param>
@@ -48,11 +48,17 @@ internal static class StoryGraphProjection
     ///     Omitted means everything is editable, which is the unlayered case and every existing
     ///     caller.
     /// </param>
+    /// <param name="nameFilterMode">
+    ///     How <paramref name="nameFilter" /> is read - see <see cref="StoryNamePattern" />. Null is
+    ///     plain text.
+    /// </param>
     public static GetStoryGraphResult Project(
         StoryCampaignModel model, string? nameFilter, string? branch, string? lifecycle,
         string? reachableFrom, string? plotState = null, string? reachableDirection = null,
-        string? scope = null, Func<string?, string?>? readOnlyOwner = null)
+        string? scope = null, Func<string?, string?>? readOnlyOwner = null,
+        string? nameFilterMode = null)
     {
+        var nameAnswers = StoryNamePattern.Compile(nameFilter, nameFilterMode);
         // The scope decides which nodes a panel can show at all; the filters below then choose
         // among them. Lifecycles and reachability still come from the WHOLE graph, because a
         // battle's event is armed by the same campaign whichever panel shows it.
@@ -83,8 +89,7 @@ internal static class StoryGraphProjection
         var keptEvents = new HashSet<string>(StringComparer.Ordinal);
         foreach (var node in scoped.Nodes.Where(n => n.Kind == StoryNodeKind.Event))
         {
-            if (nameFilter is { Length: > 0 } name &&
-                !node.Label.Contains(name, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!nameAnswers(node.Label)) continue;
             if (branch is { Length: > 0 } branchFilter &&
                 !string.Equals(node.Event!.Branch, branchFilter, StringComparison.OrdinalIgnoreCase)) continue;
             if (lifecycle is { Length: > 0 } lifecycleFilter &&

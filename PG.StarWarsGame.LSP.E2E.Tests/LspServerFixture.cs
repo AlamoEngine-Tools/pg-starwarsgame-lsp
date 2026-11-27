@@ -199,48 +199,21 @@ public class LspServerFixture : IAsyncLifetime
     ///         happens to satisfy a negative, which is the same coin the other way up. Settling is
     ///         the only reading that matches what the assertion means.
     ///     </para>
+    ///     <para>
+    ///         A test that changes something while it waits passes <paramref name="after" />: the
+    ///         moment the server has taken the change in, such as the answer to a request sent after
+    ///         the edit's notifications. Publishes from before it are dropped and the quiet window
+    ///         starts there - see <see cref="SettledDiagnostics.WaitAsync" /> for what goes wrong
+    ///         without it.
+    ///     </para>
     /// </remarks>
-    public async Task<PublishDiagnosticsParams?> WaitForSettledDiagnosticsAsync(
-        DocumentUri uri, TimeSpan quiet, TimeSpan timeout)
+    public Task<PublishDiagnosticsParams?> WaitForSettledDiagnosticsAsync(
+        DocumentUri uri, TimeSpan quiet, TimeSpan timeout, Task? after = null)
     {
-        var uriStr = uri.ToString();
-        var gate = new object();
-        PublishDiagnosticsParams? last = null;
-        var lastAt = DateTime.UtcNow;
-
-        void Handler(PublishDiagnosticsParams p)
-        {
-            if (!string.Equals(p.Uri.ToString(), uriStr, StringComparison.OrdinalIgnoreCase)) return;
-            lock (gate)
-            {
-                last = p;
-                lastAt = DateTime.UtcNow;
-            }
-        }
-
-        DiagnosticsReceived += Handler;
-        try
-        {
-            var deadline = DateTime.UtcNow + timeout;
-            while (DateTime.UtcNow < deadline)
-            {
-                await Task.Delay(25);
-                lock (gate)
-                {
-                    if (last is not null && DateTime.UtcNow - lastAt >= quiet)
-                        return last;
-                }
-            }
-
-            lock (gate)
-            {
-                return last;
-            }
-        }
-        finally
-        {
-            DiagnosticsReceived -= Handler;
-        }
+        return SettledDiagnostics.WaitAsync(
+            handler => DiagnosticsReceived += handler,
+            handler => DiagnosticsReceived -= handler,
+            uri, quiet, timeout, after);
     }
 
     public Task<PublishDiagnosticsParams> WaitForDiagnosticsAsync(DocumentUri uri, TimeSpan timeout)

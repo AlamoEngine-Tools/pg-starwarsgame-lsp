@@ -20,6 +20,13 @@ const {pathToFileURL} = require('node:url');
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT_FILES = ['setup-workspace.sh', 'setup-workspace.ps1'];
 
+// The pipeline says when a pull request changed none of this harness's inputs
+// (scripts/setup-scripts-changed.js), and every scenario is then skipped with the reason: the
+// harness was the slowest step of the Windows job and the two scripts change a few times a year.
+// Only the explicit word skips - unset, as on a developer machine, everything runs.
+const UNCHANGED =
+    process.env.SETUP_SCRIPTS_CHANGED === 'false' ? 'neither setup script changed in this pull request' : false;
+
 // ── Environment ──────────────────────────────────────────────────────────────
 
 // Isolate git from the machine's own configuration (insteadOf rules, autocrlf, hooks paths...)
@@ -233,7 +240,7 @@ function normalize(stdout) {
 // ── Scenario runner ──────────────────────────────────────────────────────────
 
 function scenario(name, body) {
-    test(name, async (t) => {
+    test(name, {skip: UNCHANGED}, async (t) => {
         const outputs = {};
         for (const shell of SHELLS) {
             await t.test(shell.name, {skip: shell.available ? false : `${shell.name} not found`}, () => {

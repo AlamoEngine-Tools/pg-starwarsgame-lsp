@@ -3,10 +3,11 @@
 
 // The Model tree: every bone, mesh and proxy, filtered, folded and switched row by row.
 
-import type { Dispatch, SetStateAction, RefObject } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import type { ModelTree } from "../useModelTree";
 import * as l10n from "@vscode/l10n";
 import { IconButton } from "../../shared/Button";
+import { SearchPlate } from "../../shared/SearchPlate";
 import { DockSection } from "../../shared/DockSection";
 import {
     EYE_ICONS,
@@ -26,7 +27,6 @@ export interface ModelTreeSectionProps {
     clearSelection: () => void;
     detailsRow: string | null;
     openInspector: (rowId: string) => void;
-    searchRef: RefObject<HTMLDivElement | null>;
     selected: ReadonlySet<string>;
     setAnchor: Dispatch<SetStateAction<string | null>>;
     setSearchPressed: Dispatch<SetStateAction<boolean>>;
@@ -39,7 +39,6 @@ export function ModelTreeSection({
     clearSelection,
     detailsRow,
     openInspector,
-    searchRef,
     selected,
     setAnchor,
     setSearchPressed,
@@ -257,91 +256,48 @@ ${becauseText(node.because)}`
                                     ON the tree rather than under it, so it costs the list no
                                     height at all. The list carries a matching pad at its foot, so
                                     the last row can still be scrolled clear of the strip. */}
-                <div
-                    className={"tree-search" + (tree.searchOpen ? " open" : "")}
-                    ref={searchRef}
+                <SearchPlate
+                    open={tree.searchOpen}
+                    pattern={tree.boneFilter}
+                    mode={tree.boneFilterMode}
+                    filtered={tree.filtered}
+                    error={tree.filterError}
+                    placeholder={l10n.t("Filter the tree, e.g. HP_")}
+                    title={l10n.t("Filter the tree by name")}
+                    onPattern={tree.setBoneFilter}
+                    onMode={tree.setBoneFilterMode}
+                    onOpen={setSearchPressed}
+                    onReset={tree.resetFilter}
+                    beside
                 >
-                    {/* The box grows into the space to the LEFT of the icons,
-                                        which never move. That is what makes the strip a fixed
-                                        anchor rather than a row that rearranges itself: press the
-                                        magnifier and the field appears beside it, press again and
-                                        it is gone, and nothing you were pointing at has shifted. */}
-                    {tree.searchOpen && (
-                        <input
-                            className="tree-filter"
-                            type="text"
-                            autoFocus
-                            value={tree.boneFilter}
-                            placeholder={l10n.t("Filter the tree, e.g. HP_")}
-                            onChange={(e) => tree.setBoneFilter(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Escape") {
-                                    e.stopPropagation();
-                                    tree.setBoneFilter("");
-                                    setSearchPressed(false);
-                                }
-                            }}
-                        />
-                    )}
-
-                    {/* The four icons are ONE flex item, so the plate can only
-                                        wrap between the field and the strip - never in the middle
-                                        of the strip. Left loose, the magnifier stayed up on the
-                                        field's line and the three kinds dropped below it, which is
-                                        neither of the two layouts this is meant to have. */}
-                    <div className="tree-search-icons">
-                        <IconButton
-                            icon="search"
-                            className={
-                                "tree-search-toggle" +
-                                (tree.searchOpen ? " active" : "")
-                            }
-                            expanded={tree.searchOpen}
-                            title={
-                                tree.searchOpen
-                                    ? l10n.t("Close the filter")
-                                    : l10n.t("Filter the tree by name")
-                            }
-                            onClick={() => {
-                                // Closing clears. A pattern kept behind a closed box
-                                // would reopen it immediately - see searchIsOpen - so
-                                // the press would appear to do nothing at all.
-                                if (tree.searchOpen) {
-                                    tree.setBoneFilter("");
-                                }
-                                setSearchPressed((open) => !open);
-                            }}
-                        />
-
-                        {/* Always here, open or closed. A pattern and a kind are two
+                    {/* Always here, open or closed. A pattern and a kind are two
                                         halves of the same question, and hiding one of them the
                                         moment you start typing makes narrowing by kind a round
                                         trip out of the box you are typing in. */}
-                        {TREE_KINDS.map((kind) => (
-                            <IconButton
-                                key={kind}
-                                icon={KIND_ICONS[kind]}
-                                className={
-                                    tree.kinds.has(kind) ? "active" : undefined
-                                }
-                                pressed={tree.kinds.has(kind)}
-                                title={l10n.t(
-                                    "Show {0}",
-                                    KIND_LABELS[kind].toLowerCase(),
-                                )}
-                                onClick={() =>
-                                    tree.setKinds((current) => {
-                                        const next = new Set(current);
-                                        if (!next.delete(kind)) {
-                                            next.add(kind);
-                                        }
-                                        return next;
-                                    })
-                                }
-                            />
-                        ))}
-                    </div>
-                </div>
+                    {TREE_KINDS.map((kind) => (
+                        <IconButton
+                            key={kind}
+                            icon={KIND_ICONS[kind]}
+                            className={
+                                tree.kinds.has(kind) ? "active" : undefined
+                            }
+                            pressed={tree.kinds.has(kind)}
+                            title={l10n.t(
+                                "Show {0}",
+                                KIND_LABELS[kind].toLowerCase(),
+                            )}
+                            onClick={() =>
+                                tree.setKinds((current) => {
+                                    const next = new Set(current);
+                                    if (!next.delete(kind)) {
+                                        next.add(kind);
+                                    }
+                                    return next;
+                                })
+                            }
+                        />
+                    ))}
+                </SearchPlate>
             </div>
         </DockSection>
     );

@@ -33,6 +33,8 @@ import { Modal } from "../shared/Modal";
 import { DockSection } from "../shared/DockSection";
 import { Icon, type IconName } from "../shared/Icon";
 import { ProblemsPanel } from "../shared/ProblemsPanel";
+import { SearchPlate } from "../shared/SearchPlate";
+import { compileMatcher, type SearchMode } from "../shared/searchPattern";
 import { TransportBar } from "../shared/TransportBar";
 
 import {
@@ -1943,7 +1945,10 @@ export function SimViewToggles(props: {
 
 // ── Trace ────────────────────────────────────────────────────────────────────
 
-/** The trace, in the bottom panel: one row per step, filterable, copyable, each row a jump. */
+/**
+ * The trace, in the bottom panel: one row per step, each row a jump. Searched from the search plate
+ * on the panel's lower right corner, as every list is; copied from the panel's bar.
+ */
 export function TracePanel(props: {
     state: StorySimStateDto;
     steps: readonly StorySimStepDto[];
@@ -1952,11 +1957,16 @@ export function TracePanel(props: {
     onClose: () => void;
 }): React.JSX.Element {
     const [query, setQuery] = useState("");
+    const [mode, setMode] = useState<SearchMode>("text");
+    const [searchOpen, setSearchOpen] = useState(false);
     const rows = useMemo(
         () => traceRows(props.steps, props.labelOf),
         [props.steps, props.labelOf],
     );
-    const shown = useMemo(() => filterTrace(rows, query), [rows, query]);
+    const shown = useMemo(
+        () => filterTrace(rows, query, mode),
+        [rows, query, mode],
+    );
     const tail = shown.slice(-400);
     // A trace reads newest-last, so new rows keep the end in view. Measured on the shadow run:
     // after a tick the panel sat at its top showing tick 0 rows while the new ones were below the
@@ -1984,14 +1994,7 @@ export function TracePanel(props: {
                 query ? `${shown.length} of ${rows.length}` : rows.length,
             )}
             onClose={props.onClose}
-        >
-            <div className="sim-trace-tools">
-                <input
-                    type="text"
-                    placeholder={l10n.t("Filter (t12 = tick 12)")}
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                />
+            actions={
                 <IconButton
                     icon="copy"
                     title={l10n.t("Copy")}
@@ -1999,7 +2002,8 @@ export function TracePanel(props: {
                     disabledReason={l10n.t("Nothing to copy")}
                     onClick={() => props.actions.copy(copyText())}
                 />
-            </div>
+            }
+        >
             <div className="problem-list">
                 {tail.length < shown.length ? (
                     <div className="sim-trace-row muted">
@@ -2050,6 +2054,29 @@ export function TracePanel(props: {
                     </div>
                 ))}
             </div>
+            {/* On the panel's lower right corner, over the rows - the list carries a pad at its end
+                so the last row can be scrolled clear of it. Plain text keeps the trace's tick
+                shorthand. */}
+            <SearchPlate
+                open={searchOpen}
+                pattern={query}
+                mode={mode}
+                filtered={query !== ""}
+                error={compileMatcher(query.trim(), mode).error}
+                placeholder={TRACE_PLACEHOLDERS[mode]}
+                title={l10n.t("Filter the trace")}
+                onPattern={setQuery}
+                onMode={setMode}
+                onOpen={setSearchOpen}
+                onReset={() => setQuery("")}
+            />
         </ProblemsPanel>
     );
 }
+
+/** Examples for the trace's field, per mode. A row reads as its tick, then its event and cause. */
+const TRACE_PLACEHOLDERS: Record<SearchMode, string> = {
+    text: l10n.t("Filter (t12 = tick 12)"),
+    wildcard: "*_Start*",
+    regex: "^t12 ",
+};

@@ -171,6 +171,11 @@ export interface GraphFilters {
      * event in a running plot whose prereq has not fired.
      */
     plotState?: string;
+    /**
+     * How `nameFilter` is read: `text`, `wildcard` or `regex`, as the search plate's field shows it.
+     * Absent is plain text, which is what the filter did before it had modes.
+     */
+    nameFilterMode?: string;
 }
 
 // ── aet/getStorySchema ───────────────────────────────────────────────────────
@@ -204,6 +209,11 @@ export interface StoryTypeSchemaDto {
      */
     notes: StoryNoteDto[];
     params: StoryParamSchemaDto[];
+    /**
+     * The type's display name, in one to four words: what a palette tile shows where the reader has
+     * asked for names and not identifiers. Null for a type the schema has not named.
+     */
+    label?: string | null;
 }
 
 export interface GetStorySchemaResult {

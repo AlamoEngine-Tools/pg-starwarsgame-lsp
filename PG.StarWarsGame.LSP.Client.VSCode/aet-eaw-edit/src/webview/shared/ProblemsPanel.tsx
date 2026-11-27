@@ -60,6 +60,8 @@ export function ProblemsPanel(props: {
      * exactly as it always did. See `filterProblems`.
      */
     filter?: ProblemFilterControl;
+    /** The panel's own actions, in its bar before the close button - the trace's copy, for one. */
+    actions?: React.ReactNode;
     children: React.ReactNode;
 }): React.JSX.Element {
     // Closing and reopening the bar is not a request to forget how tall it was, and neither is
@@ -129,6 +131,8 @@ export function ProblemsPanel(props: {
                             : ""}
                     </button>
                 )}
+
+                {props.actions}
 
                 <button
                     className="panel-close"

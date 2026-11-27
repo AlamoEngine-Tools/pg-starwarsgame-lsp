@@ -70,9 +70,90 @@
   a refactoring is, and one undo in any of the files takes the rename back in all of them. The entry is
   disabled, with the reason, on the node of the campaigns that declare no set and on a set no member of
   the project belongs to ([#181](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/181))
+- **A page toolbar above the editor and its dock** - the story graph, the localisation and credits editors,
+  the model preview and the encyclopedia preview carry one bar across the top of the page. Save is its first
+  control on the left and the validation tag its last on the right, on every page that has them. The
+  model preview's hand-off to AloViewer or the Particle Editor stands in the bar as well. In the story graph
+  Save stays in view outside Edit mode, disabled, with the reason. The dock's header keeps the mode dial and
+  the state of what is open ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **A fold for the dock header** - the header that holds the mode dial folds away with the chevron in its
+  top-right corner and opens with it again. The dock of each editor keeps its own fold between sessions
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **Discard beside Save** - the page toolbar of the story graph, the localisation editor and the credits
+  editor carries Discard next to Save. It drops every staged change and shows what is saved again, and writes
+  nothing. It asks first; *Discard & Don't Ask Again* answers for good, and the new setting
+  `aet-eaw-edit.editors.confirmDiscard` turns the question back on
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **Scene reset, Destroy all and Repair all on the preview's dial** - the dial of the model preview carries
+  what a lens does to everything it shows. Scene reset stands in the same place in every lens and puts the
+  subject back as it loaded, without loading it again: the rest pose, every part and effect as it opened,
+  the damage state and the detail level, the hardpoints, hull and shield, the turrets, speed, ion stun and
+  engines, the abilities, the selection and the damage log. The camera, the overlays, the lens, the attacker
+  and the tree's filter and folded rows stay as set. In Gameplay, Destroy all hardpoints and Repair all
+  hardpoints stand at the dial's other end; they left the title of the Hardpoints section
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **A tail from a stage flyout to its pill** - each flyout on the stage of the model preview and of the story
+  graph carries a point on its edge that ends at the pill that opened it, as a speech bubble points at its
+  speaker. Weapon settings and Damage log stop at the same edge of the stage, and the tail shows which pill
+  each belongs to ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **Display names for story types** - the story graph's palette names an event or reward type in words, such
+  as *Time elapsed* for `STORY_ELAPSED`, on a smaller tile, and an event's tile carries a glyph of its own.
+  The tile's tooltip holds the technical name, and the palette's search finds a type by either name; a tile
+  found by its technical name alone shows that name while the search is set. The new setting
+  `aet-eaw-edit.editors.storyTypeNames` switches the tiles to the technical names, in a graph that is open
+  too ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **Documentation on a story type's tile** - each event and reward tile in the story graph's palette carries
+  an info pill that opens the type's documentation beside the dock: both names, what the type does, the
+  schema's notes and every parameter with what it holds. The pill is red on a type the engine does not run
+  and yellow on one nobody has verified. The flyouts an info pill opens, here and on a hardpoint or ability
+  card in the model preview, carry a tail that points at the pill
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **One search plate for the lists in a dock** - the story graph's palette is searched from a plate at the
+  foot of the dock, as the model tree is: a magnifier, the palette's two kinds, event types and rewards,
+  and a filter icon. The field opens beside the plate, over the stage, to the left of icons that do not
+  move, and holds the three ways of reading a pattern - plain text, wildcard and regular expression,
+  written as `ab`, `*?` and `.*`. A narrowed group says so in its title, such as `1 of 64`, and a kind
+  switched off takes its group away.
+  Escape and the magnifier close the field and leave the pattern in force. The filter icon becomes the
+  reset once a pattern or a switched-off kind narrows the list, and names the pattern in its tooltip.
+  The model tree's and the hardpoint list's searches are the same plate, the hardpoint list's on the
+  lower right corner of the list as the others are
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **The localisation editors' search on the grid** - the translation and credits editors are searched
+  from the same plate, on the grid's lower right corner, and the dock keeps no search. The field holds
+  the three ways of reading a pattern; which column the pattern is read in is a pill on the line above
+  it, and a regular expression that does not compile says why on that line. The translation editor's
+  Inherited switch is a quick filter beside the magnifier, with the count of entries it would bring
+  back. The filter icon resets the pattern, the column and the switch together
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **The story graph's event filter on the canvas** - the event filter is the same plate, on the
+  canvas's lower right corner beside the colour key, and the dock's foot keeps no filter. The event
+  name is read as plain text, with wildcards or as a regular expression, and the server matches it in
+  that mode, so the graph shows the events the pattern means. The branch, the lifecycle and the plot
+  state are pills on the line above the field. The filter icon clears all four and keeps the mode
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **View controls only in the dock's foot** - the story graph's foot holds the minimap, the canvas
+  tools at its right - zoom in, zoom out, fit, arrange and the two lanes - and a zoom slider with the
+  zoom in percent under them, which follows the wheel and zooms about the middle of the view. The
+  encyclopedia card's zoom is the same slider, its size in percent where it read `Zoom 3.00x`
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **The simulation trace's search on the plate** - the story simulation's trace is searched from the
+  same plate, on the trace panel's lower right corner, and its copy button stands in the panel's bar.
+  Plain text keeps the tick shorthand, `t12` for tick 12; wildcards and regular expressions read a row
+  with its tick first, so `^t12 ` asks for that tick
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 
+- **A stage flyout opens at the pill that opens it** - the flyouts on the stage of the model preview and of
+  the story graph hung from a fixed corner of the stage, whichever pill had opened them. The abilities flyout
+  sat off its pill and overlapped the command bar that holds the pill. Each flyout now opens centred on its
+  pill, below a pill on the top edge and above one on the bottom edge, clear of the pill's plate, and follows
+  the pill when the panel is resized. The stage's side edge still stops it
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **The projectile search stays inside the weapon flyout** - the search field in the model preview's weapon
+  settings ran past the flyout's right edge, and the flyout scrolled sideways
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 - **A rename of a `Campaign_Set` or `Overlap_Test` value leaves a dependency's files alone** - renaming
   the value in a project that extends another rewrote the members in the referenced project's files too,
   which no other rename does. Only the members the project owns are rewritten now, and a value none of

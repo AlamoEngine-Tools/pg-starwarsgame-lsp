@@ -46,6 +46,7 @@ import {
 } from "./shared/dockChrome";
 import { DockSection } from "./shared/DockSection";
 import { Field } from "./shared/Field";
+import { ZoomSlider } from "./shared/ZoomSlider";
 import { SeverityMark } from "./shared/Icon";
 import { ProblemsPanel } from "./shared/ProblemsPanel";
 import { problemLook } from "./shared/problemLook";
@@ -55,6 +56,7 @@ import { SelectField } from "./shared/SelectField";
 import { initPanelLayout } from "./shared/panelLayoutBridge";
 import { poster, transport, vscodeApi } from "./shared/vscodeApi";
 import { SeverityTag } from "./shared/SeverityTag";
+import { PageToolbar } from "./shared/PageToolbar";
 import { ModeSelector } from "./shared/ModeSelector";
 import {
     BODY_MODES,
@@ -101,10 +103,17 @@ const Shell = styled.div`
 
     height: 100%;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     min-height: 0;
     font-family: var(--font-family-ui);
     font-size: var(--font-size-12);
+
+    /* Under the page toolbar: the card's column and the dock, side by side. */
+    .body {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+    }
 
     /* The stage column: the card, with the notes bar under it. The bar sits INSIDE this column so
        it borders the dock rather than running underneath it - the dock stays full height. Same
@@ -371,186 +380,197 @@ function App(): React.JSX.Element {
 
     return (
         <Shell>
-            <div className="stage-column">
-                <div className="preview-stage" ref={stageRef}>
-                    {stage}
+            <PageToolbar
+                verdict={
+                    <SeverityTag
+                        severity={severity}
+                        count={notices.length}
+                        expanded={noticesOpen}
+                        disabled={notices.length === 0}
+                        disabledReason={l10n.t(
+                            "Nothing to report about this card",
+                        )}
+                        title={l10n.t(
+                            "{0} {1} about this card. Press to {2} them.",
+                            notices.length,
+                            noticeWord,
+                            noticesOpen ? "hide" : "read",
+                        )}
+                        onClick={() => setNoticesOpen((open) => !open)}
+                    />
+                }
+            />
+            <div className="body">
+                <div className="stage-column">
+                    <div className="preview-stage" ref={stageRef}>
+                        {stage}
+                    </div>
+
+                    {noticesOpen && notices.length > 0 && (
+                        <ProblemsPanel
+                            className="encyclopedia-problems problems-band prose-problems"
+                            memoKey="encyclopedia.problems"
+                            defaultHeight={120}
+                            title={noticeTitle}
+                            onClose={() => setNoticesOpen(false)}
+                        >
+                            <div className="problem-list">
+                                {notices.map((notice) => (
+                                    <div
+                                        key={notice.message}
+                                        className="problem-row"
+                                    >
+                                        <SeverityMark
+                                            severity={
+                                                problemLook(notice.severity)
+                                                    .tone
+                                            }
+                                            className={"sev-" + notice.severity}
+                                        />
+                                        <span className="problem-msg">
+                                            {notice.message}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </ProblemsPanel>
+                    )}
                 </div>
 
-                {noticesOpen && notices.length > 0 && (
-                    <ProblemsPanel
-                        className="encyclopedia-problems problems-band prose-problems"
-                        memoKey="encyclopedia.problems"
-                        defaultHeight={120}
-                        title={noticeTitle}
-                        onClose={() => setNoticesOpen(false)}
-                    >
-                        <div className="problem-list">
-                            {notices.map((notice) => (
-                                <div
-                                    key={notice.message}
-                                    className="problem-row"
-                                >
-                                    <SeverityMark
-                                        severity={
-                                            problemLook(notice.severity).tone
-                                        }
-                                        className={"sev-" + notice.severity}
-                                    />
-                                    <span className="problem-msg">
-                                        {notice.message}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </ProblemsPanel>
-                )}
-            </div>
-
-            <RightDock
-                memoKey="encyclopedia.dock"
-                initialWidth={220}
-                minWidth={180}
-                maxWidth={420}
-                header={
-                    <>
-                        <span className="header-title" title={entry?.objectId}>
-                            {title}
-                        </span>
-                        <SeverityTag
-                            severity={severity}
-                            count={notices.length}
-                            expanded={noticesOpen}
-                            disabled={notices.length === 0}
-                            disabledReason={l10n.t(
-                                "Nothing to report about this card",
-                            )}
-                            title={l10n.t(
-                                "{0} {1} about this card. Press to {2} them.",
-                                notices.length,
-                                noticeWord,
-                                noticesOpen ? "hide" : "read",
-                            )}
-                            onClick={() => setNoticesOpen((open) => !open)}
-                        />
-                    </>
-                }
-                content={
-                    <>
-                        <DockSection
-                            title={l10n.t("Ship names")}
-                            count={entry?.shipNames?.names.length}
-                        >
-                            {/* Three cases, and the middle one is why this is not a ternary: a pool
+                <RightDock
+                    memoKey="encyclopedia.dock"
+                    initialWidth={220}
+                    minWidth={180}
+                    maxWidth={420}
+                    header={
+                        <>
+                            <span
+                                className="header-title"
+                                title={entry?.objectId}
+                            >
+                                {title}
+                            </span>
+                        </>
+                    }
+                    content={
+                        <>
+                            <DockSection
+                                title={l10n.t("Ship names")}
+                                count={entry?.shipNames?.names.length}
+                            >
+                                {/* Three cases, and the middle one is why this is not a ternary: a pool
                             that read empty must not draw an empty bordered box, and must not be
                             described as "not registered" either - it IS wired up, and the notes
                             bar carries the reason it came back empty. */}
-                            {entry?.shipNames &&
-                                entry.shipNames.names.length > 0 && (
-                                    <ul className="name-list">
-                                        {entry.shipNames.names.map((name) => (
-                                            <li
-                                                key={name}
-                                                className={
-                                                    name === shipName
-                                                        ? "drawn"
-                                                        : undefined
-                                                }
-                                            >
-                                                <span>{name}</span>
-                                                {name === shipName && (
-                                                    <span className="drawn-tag">
-                                                        {l10n.t("on the card")}
-                                                    </span>
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            {entry?.shipNames &&
-                                entry.shipNames.names.length === 0 && (
+                                {entry?.shipNames &&
+                                    entry.shipNames.names.length > 0 && (
+                                        <ul className="name-list">
+                                            {entry.shipNames.names.map(
+                                                (name) => (
+                                                    <li
+                                                        key={name}
+                                                        className={
+                                                            name === shipName
+                                                                ? "drawn"
+                                                                : undefined
+                                                        }
+                                                    >
+                                                        <span>{name}</span>
+                                                        {name === shipName && (
+                                                            <span className="drawn-tag">
+                                                                {l10n.t(
+                                                                    "on the card",
+                                                                )}
+                                                            </span>
+                                                        )}
+                                                    </li>
+                                                ),
+                                            )}
+                                        </ul>
+                                    )}
+                                {entry?.shipNames &&
+                                    entry.shipNames.names.length === 0 && (
+                                        <div className="dock-hint">
+                                            {l10n.t(
+                                                "This object is wired up for individual names, but none could be read. See the notes for why.",
+                                            )}
+                                        </div>
+                                    )}
+                                {entry !== null && !entry.shipNames && (
                                     <div className="dock-hint">
                                         {l10n.t(
-                                            "This object is wired up for individual names, but none could be read. See the notes for why.",
+                                            "This object shows its class line. Only objects registered in GameConstants under ShipNameTextFiles draw an individual name here.",
                                         )}
                                     </div>
                                 )}
-                            {entry !== null && !entry.shipNames && (
-                                <div className="dock-hint">
-                                    {l10n.t(
-                                        "This object shows its class line. Only objects registered in GameConstants under ShipNameTextFiles draw an individual name here.",
+                            </DockSection>
+                        </>
+                    }
+                    overview={
+                        <>
+                            {/* The shared zoom of a dock's foot, as the story graph has it: the card's
+                            size in percent beside the track. */}
+                            <Field label={l10n.t("Zoom")}>
+                                <ZoomSlider
+                                    value={zoom}
+                                    min={ZOOM_MIN}
+                                    max={ZOOM_MAX}
+                                    step={ZOOM_STEP}
+                                    label={l10n.t("Zoom")}
+                                    title={l10n.t(
+                                        "Drag, or scroll over the preview",
                                     )}
-                                </div>
-                            )}
-                        </DockSection>
-                    </>
-                }
-                overview={
-                    <>
-                        <Field
-                            label={l10n.t("Zoom {0}x", zoom.toFixed(2))}
-                            as="label"
-                        >
-                            <input
-                                type="range"
-                                min={ZOOM_MIN}
-                                max={ZOOM_MAX}
-                                step={ZOOM_STEP}
-                                value={zoom}
-                                onChange={(e) =>
-                                    setZoom(clampZoom(Number(e.target.value)))
-                                }
-                                title={l10n.t(
-                                    "Drag, or scroll over the preview",
-                                )}
-                            />
-                        </Field>
+                                    onZoom={(next) => setZoom(clampZoom(next))}
+                                />
+                            </Field>
 
-                        {/* Both of these pick one of a handful, and in both the alternatives are the
+                            {/* Both of these pick one of a handful, and in both the alternatives are the
                         point - so they read as joined buttons rather than hiding every option but
                         one behind a click. The faction row stays VISIBLE when there is nothing to
                         switch to, disabled and saying why: that is the arrangement where a reader
                         most needs telling the choice exists at all. */}
-                        <Field label={l10n.t("Faction frame")}>
-                            <ModeSelector
-                                label={l10n.t("Faction frame")}
-                                value={String(factionSlot)}
-                                options={factionModes(factionFrames)}
-                                onSelect={(id) =>
-                                    setFactionSlot(factionSlotOf(id))
-                                }
-                            />
-                        </Field>
+                            <Field label={l10n.t("Faction frame")}>
+                                <ModeSelector
+                                    label={l10n.t("Faction frame")}
+                                    value={String(factionSlot)}
+                                    options={factionModes(factionFrames)}
+                                    onSelect={(id) =>
+                                        setFactionSlot(factionSlotOf(id))
+                                    }
+                                />
+                            </Field>
 
-                        <Field label={l10n.t("Body")}>
-                            <ModeSelector
-                                label={l10n.t("Body text")}
-                                value={bodyModeOf(multiplayer)}
-                                options={BODY_MODES}
-                                onSelect={(id) =>
-                                    onToggleMultiplayer(id === "mp")
-                                }
-                            />
-                        </Field>
+                            <Field label={l10n.t("Body")}>
+                                <ModeSelector
+                                    label={l10n.t("Body text")}
+                                    value={bodyModeOf(multiplayer)}
+                                    options={BODY_MODES}
+                                    onSelect={(id) =>
+                                        onToggleMultiplayer(id === "mp")
+                                    }
+                                />
+                            </Field>
 
-                        {/* What the card IS drawn for, beside the other choices of which card - not
+                            {/* What the card IS drawn for, beside the other choices of which card - not
                         beside Zoom, which only changes how large it is shown. The game sizes these
                         glyphs from the display it runs on; the list is the common ones. */}
-                        <Field label={l10n.t("Screen")}>
-                            <SelectField
-                                value={encyclopediaScreenId(screen)}
-                                options={ENCYCLOPEDIA_SCREENS.map((s) => ({
-                                    value: encyclopediaScreenId(s),
-                                }))}
-                                onChange={onPickScreen}
-                                ariaLabel={l10n.t("Screen")}
-                                title={l10n.t(
-                                    "The screen resolution the card is drawn for",
-                                )}
-                            />
-                        </Field>
-                    </>
-                }
-            />
+                            <Field label={l10n.t("Screen")}>
+                                <SelectField
+                                    value={encyclopediaScreenId(screen)}
+                                    options={ENCYCLOPEDIA_SCREENS.map((s) => ({
+                                        value: encyclopediaScreenId(s),
+                                    }))}
+                                    onChange={onPickScreen}
+                                    ariaLabel={l10n.t("Screen")}
+                                    title={l10n.t(
+                                        "The screen resolution the card is drawn for",
+                                    )}
+                                />
+                            </Field>
+                        </>
+                    }
+                />
+            </div>
         </Shell>
     );
 }

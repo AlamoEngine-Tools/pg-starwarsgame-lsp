@@ -69,6 +69,16 @@ export class LocalisationPanelState {
     }
 
     /**
+     * The page dropped what it had staged. Its rows still carry those edits, so the next read is
+     * handed over even though the file has not moved - the one case where an unchanged file is
+     * worth delivering.
+     */
+    noteDiscarded(): void {
+        this._deliveredHash = undefined;
+        this._pending = [];
+    }
+
+    /**
      * A save that landed. The returned hash becomes the basis for the next one; without adopting it
      * the second save of a session would always be refused as stale. A save that returns no hash
      * leaves the previous one in place, since dropping to undefined would be rejected outright as

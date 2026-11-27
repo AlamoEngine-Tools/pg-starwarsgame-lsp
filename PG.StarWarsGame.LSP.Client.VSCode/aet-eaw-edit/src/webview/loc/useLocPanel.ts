@@ -22,6 +22,7 @@ import { worstSeverity } from "./validateState";
 
 import { initPanelLayout } from "../shared/panelLayoutBridge";
 import { poster, transport, vscodeApi } from "../shared/vscodeApi";
+import { requestDiscard } from "../shared/discardRequest";
 
 // Reads the dock and drawer sizes the host seeded into the page, and reports
 // every drag back to it. Must run before anything measures itself.
@@ -83,6 +84,8 @@ export interface LocPanel<C> {
     /** Applies a command locally and adds it to the queue. Nothing reaches disk before Save. */
     stage: (command: C) => void;
     save: () => void;
+    /** Drops what is staged, once the reader has agreed, and reads the file again. */
+    discard: () => void;
     validate: () => void;
     post: (message: LocalisationEditorToHost<unknown>) => void;
 }
@@ -252,6 +255,16 @@ export function useLocPanel<C>(options: {
         post({ type: "saveBatch", commands: coalesce(queue) });
     }, [queue, coalesce]);
 
+    // Drops what is staged: the file is read again, which clears the queue with the rows it brings.
+    // The host is told why, or it would not send an unchanged file a second time.
+    const discard = useCallback(() => {
+        void requestDiscard(transport, queue.length).then((confirmed) => {
+            if (confirmed) {
+                post({ type: "fetch", discarded: true });
+            }
+        });
+    }, [queue]);
+
     const validate = useCallback(() => {
         post({
             type: "validateBatch",
@@ -278,6 +291,7 @@ export function useLocPanel<C>(options: {
         validation,
         stage,
         save,
+        discard,
         validate,
         post,
     };

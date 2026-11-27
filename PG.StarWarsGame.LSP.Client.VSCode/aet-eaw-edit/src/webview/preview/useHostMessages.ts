@@ -53,6 +53,7 @@ import {
     type AttackerPreset,
 } from "../../shared/projectSettings";
 import { transport } from "../shared/vscodeApi";
+import { type SearchMode } from "../shared/searchPattern";
 
 /** What useHostMessages reads from the rest of the preview. */
 export interface HostMessagesInputs {
@@ -103,6 +104,7 @@ export interface HostMessagesInputs {
     setAttackerPresets: Dispatch<SetStateAction<AttackerPreset[]>>;
     setAttackerProjectile: Dispatch<SetStateAction<string | null>>;
     setBoneFilter: Dispatch<SetStateAction<string>>;
+    setBoneFilterMode: Dispatch<SetStateAction<SearchMode>>;
     setCollapsed: Dispatch<SetStateAction<ReadonlySet<string>>>;
     setCustomColour: Dispatch<SetStateAction<string | null>>;
     setDestroyed: Dispatch<SetStateAction<ReadonlySet<string>>>;
@@ -167,6 +169,7 @@ export function useHostMessages({
     setAttackerPresets,
     setAttackerProjectile,
     setBoneFilter,
+    setBoneFilterMode,
     setCollapsed,
     setCustomColour,
     setDestroyed,
@@ -266,6 +269,7 @@ export function useHostMessages({
                         setHiddenEmitters(new Set(previous.hiddenEmitters));
                         setAnimation(previous.animation);
                         setBoneFilter(previous.filterText);
+                        setBoneFilterMode(previous.filterMode);
                         setCollapsed(new Set(previous.collapsed));
                         foldedRef.current = true;
                     }

@@ -193,6 +193,9 @@ export function useCombatLens({
     }, [justFired]);
     const logRef = useRef<HTMLDivElement | null>(null);
 
+    /** The pill that opens the damage log, which is where the log opens. */
+    const logPillRef = useRef<HTMLButtonElement | null>(null);
+
     /** Hardpoints currently blown off. */
     const [destroyed, setDestroyed] = useState<ReadonlySet<string>>(new Set());
 
@@ -1207,53 +1210,70 @@ export function useCombatLens({
         setHardpointDestroyed,
     ]);
 
-    /** Puts the target back together without touching the weapon you built. */
-    const repairTarget = useCallback(() => {
-        // The hardpoints are back, so the wreckage they shed goes with them.
-        viewportRef.current?.clearBreakoffs();
-        breakoffsRef.current = [];
+    /**
+     * Puts the target back together without touching the weapon you built.
+     *
+     * @param log Whether the repair is written into the damage log. A scene reset repairs without a
+     *     line: it clears the log, and a line arriving after that would be all that is left in it.
+     */
+    const repairTarget = useCallback(
+        (log = true) => {
+            // The hardpoints are back, so the wreckage they shed goes with them.
+            viewportRef.current?.clearBreakoffs();
+            breakoffsRef.current = [];
 
-        // The wreck and the hidden ship are NOT this function's to put back. The death watch owns
-        // that, because `Repair all` never comes through here at all - see `restoreFromDeath`.
+            // The wreck and the hidden ship are NOT this function's to put back. The death watch owns
+            // that, because `Repair all` never comes through here at all - see `restoreFromDeath`.
 
-        const full = fullPools(scene);
+            const full = fullPools(scene);
 
-        setPools((current) => {
-            // One line for the whole unit rather than one per hardpoint: the reader pressed one
-            // button, and ten lines would bury the shots that came before it.
-            const before = current?.hull ?? 0;
+            setPools((current) => {
+                // One line for the whole unit rather than one per hardpoint: the reader pressed one
+                // button, and ten lines would bury the shots that came before it.
+                const before = current?.hull ?? 0;
 
-            queueMicrotask(() =>
-                setDamageLog((lines) =>
-                    appendShot(lines, [
-                        {
-                            kind: "repair",
-                            source: BY_HAND,
-                            amount: Math.max(full.hull - before, 0),
-                            target: scene?.subject ?? "the unit",
-                            armor: null,
-                            pool: "hull",
-                            destroyed: false,
-                            workings: [
-                                l10n.t("Hull {0} -> {1}", before, full.hull),
-                                l10n.t(
-                                    "Hardpoints restored to their declared Health",
-                                ),
-                            ],
-                        },
+                queueMicrotask(() =>
+                    setDamageLog((lines) =>
+                        !log
+                            ? lines
+                            : appendShot(lines, [
+                                  {
+                                      kind: "repair",
+                                      source: BY_HAND,
+                                      amount: Math.max(full.hull - before, 0),
+                                      target: scene?.subject ?? "the unit",
+                                      armor: null,
+                                      pool: "hull",
+                                      destroyed: false,
+                                      workings: [
+                                          l10n.t(
+                                              "Hull {0} -> {1}",
+                                              before,
+                                              full.hull,
+                                          ),
+                                          l10n.t(
+                                              "Hardpoints restored to their declared Health",
+                                          ),
+                                      ],
+                                  },
+                              ]),
+                    ),
+                );
+
+                return full;
+            });
+
+            setHardpointHealth(
+                Object.fromEntries(
+                    (scene?.hardpoints ?? []).map((h) => [
+                        h.id,
+                        h.health ?? null,
                     ]),
                 ),
             );
-
-            return full;
-        });
-
-        setHardpointHealth(
-            Object.fromEntries(
-                (scene?.hardpoints ?? []).map((h) => [h.id, h.health ?? null]),
-            ),
-        );
-    }, [scene]);
+        },
+        [scene],
+    );
 
     /**
      * Whether the clip on the playhead shows the unit DEPLOYED (P5).
@@ -1387,6 +1407,7 @@ export function useCombatLens({
         setLogOpen,
         justFired,
         logRef,
+        logPillRef,
         destroyed,
         setDestroyed,
         sweeping,

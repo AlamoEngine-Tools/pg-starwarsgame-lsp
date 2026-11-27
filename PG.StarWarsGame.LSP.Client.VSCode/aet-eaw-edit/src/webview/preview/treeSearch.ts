@@ -1,12 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The model tree's search element: when its box is showing, and whether to say the tree is narrowed.
+// The model tree's search element: whether the tree is narrowed, and how its header says so.
 //
-// The box is closed until it is wanted, and opens into the space to the LEFT of a strip of icons
-// that never move - the magnifier and the three kinds. Collapsing brings its own hazard, and
-// `searchIsOpen` and `treeFilterSummary` both exist to answer it: a filter you cannot see is a
-// filter nobody can undo, and the reader is left looking at a short tree with no reason for it.
+// The box is closed until it is wanted, and closing it does not clear it: a pattern stays in force
+// behind a closed plate. That brings its own hazard, and `treeIsFiltered` and `treeFilterSummary`
+// both exist to answer it: a filter you cannot see is a filter nobody can undo, so the plate's
+// filter icon turns into the reset and the header counts what is left.
 
 /**
  * How many rows a tree holds, counting the ones a fold is currently hiding.
@@ -34,16 +34,14 @@ export function countTreeNodes(
 export const TREE_KIND_COUNT = 3;
 
 /**
- * Whether the search box is showing.
+ * Whether anything narrows the tree: a pattern, or a kind switched off.
  *
- * Not simply the button's state. A non-empty pattern keeps its own box open however the button was
- * left, because the alternative is a tree silently narrowed by text nobody can see - and the way
- * out of that state is to edit the very text the collapse just hid.
+ * A switched-off kind counts for as much as a pattern. It hides rows just the same, and it is what
+ * the plate's reset puts back.
  */
-export function searchIsOpen(pressed: boolean, pattern: string): boolean {
-    // Length, not `trim()`. A pattern of one space matches nothing and empties the tree, which is
-    // the loudest version of this bug rather than an edge case of it.
-    return pressed || pattern.length > 0;
+export function treeIsFiltered(pattern: string, kindsOn: number): boolean {
+    // Length, not `trim()`: the reset has to be there to take a stray space out of the box.
+    return pattern.length > 0 || kindsOn < TREE_KIND_COUNT;
 }
 
 /**

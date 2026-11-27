@@ -708,7 +708,8 @@
   "STY-03": {
     "open": "C:\\temp\\aet-test-STY-save",
     "settings": {
-      "aet-eaw-edit.experimental.storyEditing": true
+      "aet-eaw-edit.experimental.storyEditing": true,
+      "aet-eaw-edit.editors.confirmDiscard": false
     }
   },
   "SET-35": {
@@ -725,5 +726,71 @@
   },
   "STY-05": {
     "open": "C:\\temp\\aet-test-STY-rename"
+  },
+  "SET-37": {
+    "open": "C:\\temp\\aet-test-SET-discard",
+    "settings": {
+      "aet-eaw-edit.editors.confirmDiscard": false
+    }
+  },
+  "PRV-78": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-79": {
+    "open": "{repo}\\eaw"
+  },
+  "STY-06": {
+    "open": "{repo}\\eaw"
+  },
+  "PRV-80": {
+    "open": "{repo}\\eaw"
+  },
+  "STY-07": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
+  },
+  "STY-08": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
+  },
+  "PRV-81": {
+    "open": "{repo}\\eaw"
+  },
+  "STY-09": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
+  },
+  "PRV-82": {
+    "open": "{repo}\\eaw"
+  },
+  "SET-38": {
+    "open": "{repo}\\foc"
+  },
+  "STY-10": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
+  },
+  "STY-11": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storyEditing": true
+    }
+  },
+  "PRV-83": {
+    "open": "{repo}\\eaw"
+  },
+  "STY-12": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storySimulator": true
+    }
   }
 }

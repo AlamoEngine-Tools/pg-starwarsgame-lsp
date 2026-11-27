@@ -19,6 +19,8 @@
 
 import * as vscode from "vscode";
 
+import { confirmDiscard } from "./confirmDiscard";
+
 import { PanelProject, projectSubjectKey, projectTitle } from "./panelProject";
 import { pathKey } from "./pathKey";
 import { savePanelSize } from "./stores";
@@ -26,6 +28,8 @@ import type {
     CommonToHost,
     HostRequest,
     HostResponse,
+    ConfirmDiscard,
+    DiscardAnswer,
 } from "./protocol/panels/common";
 import type { RequestMethod } from "./protocol/requests";
 
@@ -201,6 +205,20 @@ export abstract class WebviewPanelHost<
             }
             if (msg.type === "request") {
                 void this._relay(msg as HostRequest);
+                return;
+            }
+            // One question for every editor that stages changes, so it is asked the same way in
+            // each and answered for good in one place.
+            if (msg.type === "confirmDiscard") {
+                const { id, count } = msg as ConfirmDiscard;
+                void confirmDiscard(Number(count) || 0).then((confirmed) => {
+                    const answer: DiscardAnswer = {
+                        type: "discardAnswer",
+                        id,
+                        confirmed,
+                    };
+                    void this.panel.webview.postMessage(answer);
+                });
                 return;
             }
             // Caught here, once, because a rejected handler used to vanish: the hand-off button

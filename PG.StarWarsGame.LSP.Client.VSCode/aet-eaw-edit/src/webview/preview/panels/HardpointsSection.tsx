@@ -9,6 +9,7 @@ import * as l10n from "@vscode/l10n";
 import { Fragment } from "react";
 import { type PreviewScene } from "../../../protocol/modelPreview";
 import { IconButton } from "../../shared/Button";
+import { SearchPlate } from "../../shared/SearchPlate";
 import { DockSection } from "../../shared/DockSection";
 import { safeImageSource } from "../../shared/safeImage";
 import { PartCard } from "../PartCard";
@@ -24,15 +25,17 @@ import { type PreviewViewport } from "../viewport";
 import { healthBar } from "../hardpointCards";
 import { reticleFor } from "../reticles";
 import { type HardpointGroup } from "../hardpointGroups";
+import { type SearchMode } from "../../shared/searchPattern";
 
 export interface HardpointsSectionProps {
     boneRows: Map<string, string>;
     combat: CombatLens;
     foldedGroups: ReadonlySet<string>;
     hardpointFilter: string;
+    hardpointFilterError: string | undefined;
+    hardpointFilterMode: SearchMode;
     hardpointGroups: HardpointGroup[];
     hardpointSearchOpen: boolean;
-    hardpointSearchRef: RefObject<HTMLDivElement | null>;
     infoCard: string | null;
     scene: PreviewScene | null;
     selectBoneRow: (rowId: string | undefined) => void;
@@ -40,6 +43,7 @@ export interface HardpointsSectionProps {
     selected: ReadonlySet<string>;
     setFoldedGroups: Dispatch<SetStateAction<ReadonlySet<string>>>;
     setHardpointFilter: Dispatch<SetStateAction<string>>;
+    setHardpointFilterMode: Dispatch<SetStateAction<SearchMode>>;
     setHardpointSearchPressed: Dispatch<SetStateAction<boolean>>;
     setInfoCard: Dispatch<SetStateAction<string | null>>;
     setWeaponArcs: (id: string, on: boolean) => void;
@@ -51,9 +55,10 @@ export function HardpointsSection({
     combat,
     foldedGroups,
     hardpointFilter,
+    hardpointFilterError,
+    hardpointFilterMode,
     hardpointGroups,
     hardpointSearchOpen,
-    hardpointSearchRef,
     infoCard,
     scene,
     selectBoneRow,
@@ -61,96 +66,18 @@ export function HardpointsSection({
     selected,
     setFoldedGroups,
     setHardpointFilter,
+    setHardpointFilterMode,
     setHardpointSearchPressed,
     setInfoCard,
     setWeaponArcs,
     viewportRef,
 }: HardpointsSectionProps): React.JSX.Element {
     return (
-        <DockSection
-            title={l10n.t("Hardpoints")}
-            count={combat.cards.length}
-            end={
-                <>
-                    <IconButton
-                        icon="effects"
-                        className="header-right"
-                        size={13}
-                        title={l10n.t("Destroy all hardpoints")}
-                        disabled={!combat.cards.some((c) => c.isDestroyable)}
-                        disabledReason={l10n.t(
-                            "No hardpoint on this model can be destroyed",
-                        )}
-                        onClick={() => combat.destroyAll(true)}
-                    />
-                    <IconButton
-                        icon="reset"
-                        className="header-right"
-                        size={13}
-                        title={l10n.t("Repair all hardpoints")}
-                        disabled={combat.destroyed.size === 0}
-                        disabledReason={l10n.t("Nothing is destroyed")}
-                        onClick={() => combat.destroyAll(false)}
-                    />
-                </>
-            }
-        >
+        <DockSection title={l10n.t("Hardpoints")} count={combat.cards.length}>
             <div className="field-note">
                 {l10n.t(
                     "Hover a targeting mark to see its tracked art; click one to aim the attacker at that hardpoint.",
                 )}
-            </div>
-
-            {/* The tree's own search element, in the same shape: a magnifier
-                                    that opens leftward into a field, with the icons anchored to
-                                    the right so nothing moves when it does. Filters on the TYPE,
-                                    which is what the groups are, and on the name, which is what a
-                                    reader looking for one hardpoint knows. */}
-            <div
-                className={
-                    "tree-search hardpoint-search" +
-                    (hardpointSearchOpen ? " open" : "")
-                }
-                ref={hardpointSearchRef}
-            >
-                {hardpointSearchOpen && (
-                    <input
-                        className="tree-filter"
-                        type="text"
-                        autoFocus
-                        value={hardpointFilter}
-                        placeholder={l10n.t("Filter by type or name")}
-                        onChange={(e) => setHardpointFilter(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Escape") {
-                                e.stopPropagation();
-                                setHardpointFilter("");
-                                setHardpointSearchPressed(false);
-                            }
-                        }}
-                    />
-                )}
-                <div className="tree-search-icons">
-                    <IconButton
-                        icon="search"
-                        className={
-                            "tree-search-toggle" +
-                            (hardpointSearchOpen ? " active" : "")
-                        }
-                        expanded={hardpointSearchOpen}
-                        title={
-                            hardpointSearchOpen
-                                ? l10n.t("Close the filter")
-                                : l10n.t("Filter by type or name")
-                        }
-                        onClick={() => {
-                            if (hardpointSearchOpen) {
-                                setHardpointFilter("");
-                            }
-                            setHardpointSearchPressed((open) => !open);
-                        }}
-                    />
-                </div>
             </div>
 
             {hardpointGroups.length === 0 && (
@@ -468,6 +395,26 @@ export function HardpointsSection({
                     )}
                 </Fragment>
             ))}
+
+            {/* The tree's own search plate, in the same place: the list's lower right corner.
+                The list has no pane of its own and scrolls with the dock, so the plate is the
+                last thing in the section and sticks to the dock's bottom edge for as long as the
+                list is on screen. Filters on the TYPE, which is what the groups are, and on the
+                name, which is what a reader looking for one hardpoint knows. */}
+            <SearchPlate
+                open={hardpointSearchOpen}
+                pattern={hardpointFilter}
+                mode={hardpointFilterMode}
+                filtered={hardpointFilter !== ""}
+                error={hardpointFilterError}
+                placeholder={l10n.t("Filter by type or name")}
+                onPattern={setHardpointFilter}
+                onMode={setHardpointFilterMode}
+                onOpen={setHardpointSearchPressed}
+                onReset={() => setHardpointFilter("")}
+                variant="sticky"
+                beside
+            />
         </DockSection>
     );
 }

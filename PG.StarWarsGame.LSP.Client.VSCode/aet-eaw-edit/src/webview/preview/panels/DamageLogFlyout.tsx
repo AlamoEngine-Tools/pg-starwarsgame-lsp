@@ -25,8 +25,7 @@ export function DamageLogFlyout({
     return (
         <StageFlyout
             title={l10n.t("Damage log")}
-            at="right"
-            fromBottom
+            anchor={combat.logPillRef}
             className="sizeable"
             ref={combat.logRef}
             style={{ height: combat.logHeight, width: combat.logWidth }}

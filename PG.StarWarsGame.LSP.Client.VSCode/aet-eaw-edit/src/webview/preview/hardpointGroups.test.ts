@@ -149,3 +149,30 @@ describe("groupOf", () => {
         assert.equal(groupOf(groups, "HP_Odd"), "");
     });
 });
+
+describe("groupHardpoints with a pattern mode", () => {
+    const ids = (filter: string, mode?: "text" | "wildcard" | "regex") =>
+        groupHardpoints(DESTROYER, filter, mode).flatMap((group) =>
+            group.cards.map((c) => c.id),
+        );
+
+    it("reads * and ? as wildcards in wildcard mode, on the type and on the name", () => {
+        assert.deepEqual(ids("HP_SD_Weapon_F?", "wildcard"), [
+            "HP_SD_Weapon_FL",
+            "HP_SD_Weapon_FR",
+        ]);
+        assert.deepEqual(ids("hard_point_*_generator", "wildcard"), [
+            "HP_SD_Shield",
+        ]);
+    });
+
+    it("reads the pattern as a regular expression in regex mode", () => {
+        assert.deepEqual(ids("engine$", "regex"), ["HP_SD_Engine"]);
+        assert.deepEqual(ids("(", "regex"), []);
+    });
+
+    it("takes the same characters literally in plain text", () => {
+        assert.deepEqual(ids("HP_SD_Weapon_F?"), []);
+        assert.deepEqual(ids("HP_SD_Weapon_F?", "text"), []);
+    });
+});
