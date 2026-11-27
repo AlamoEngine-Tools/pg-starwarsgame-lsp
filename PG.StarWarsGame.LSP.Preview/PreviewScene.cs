@@ -95,6 +95,25 @@ public sealed record PreviewProblem(
 [PublicAPI]
 public sealed record PreviewSourceFile(string? Path, bool Packed);
 
+/// <summary>The land model a unit wears on one map environment, from its <c>Land_Terrain_Model_Mapping</c>.</summary>
+/// <param name="Environment">The environment as the first pair for it writes it, trimmed.</param>
+/// <param name="Model">The model that pair names.</param>
+/// <param name="Resolved">Whether the model is found where the game would read it.</param>
+/// <param name="Animations">
+///     The clips the scene offers when the unit wears this model: the animation override's where the unit
+///     names one, else the model's own. Carried so the background build converts the model with the clips
+///     a request for it will ask for - the same entry - before the reader picks the environment.
+/// </param>
+public sealed record PreviewTerrainModel(
+    string Environment,
+    string Model,
+    bool Resolved = false,
+    IReadOnlyList<string>? Animations = null)
+{
+    /// <summary>Never null, so the client has one shape to walk.</summary>
+    public IReadOnlyList<string> Animations { get; init; } = Animations ?? [];
+}
+
 /// <summary>
 ///     Everything needed to draw a preview, with no binary payload.
 /// </summary>
@@ -262,8 +281,19 @@ public sealed record PreviewScene(
     // the game: the space locomotor sets a ship's engine effects to a brightness of 0.2 + 0.8 x
     // speed / Max_Speed while its engines are online - and to 0 for a type whose Max_Speed is not
     // above 0.
-    float? MaxSpeed = null)
+    float? MaxSpeed = null,
+    // The map environments the unit's Land_Terrain_Model_Mapping names, each once with the model
+    // of its FIRST pair, in written order; empty where it maps none. As the schema records the
+    // rule, that pair replaces Land_Model_Name on a map of that environment, and every other
+    // environment keeps Land_Model_Name.
+    IReadOnlyList<PreviewTerrainModel>? TerrainModels = null,
+    // The environment the scene was assembled for, as TerrainModels spells it, or null when it was
+    // assembled on the unit's default model - no environment asked for, or one the unit does not map.
+    string? Environment = null)
 {
+    /// <summary>Never null, so the client has one shape to walk.</summary>
+    public IReadOnlyList<PreviewTerrainModel> TerrainModels { get; init; } = TerrainModels ?? [];
+
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<string> Behaviors { get; init; } = Behaviors ?? [];
 

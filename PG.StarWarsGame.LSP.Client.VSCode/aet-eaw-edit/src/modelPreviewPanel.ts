@@ -115,6 +115,13 @@ export class ModelPreviewPanel extends WebviewPanelHost<
     private sceneAnimations: string[] = [];
     /** The file the subject's name resolved to, as the scene reported it - what a hand-off opens. */
     private sceneSourceFile: PreviewSourceFile | null = null;
+    /**
+     * The map environment the unit is assembled for, or null for its default model.
+     *
+     * Held on the panel rather than in `subjectStates`, so it resets when the preview opens: which
+     * map the unit stands on is a question asked of this look at it, not a fact about the unit.
+     */
+    private environment: string | null = null;
 
     private constructor(
         // Kept, not just passed up: opening the inspector tab needs it again later.
@@ -368,6 +375,13 @@ export class ModelPreviewPanel extends WebviewPanelHost<
                 );
                 return;
 
+            case "setEnvironment":
+                // As a refresh: the reader's damage state, detail level and camera stay, and only the
+                // unit's model changes under them.
+                this.environment = message.environment;
+                await this.sendScene(true);
+                return;
+
             default:
                 return;
         }
@@ -468,7 +482,7 @@ export class ModelPreviewPanel extends WebviewPanelHost<
     ): Promise<void> {
         const result = await this.project.gateway.request(
             "aet/getPreviewScene",
-            requestFor(this.subject),
+            requestFor(this.subject, this.environment),
         );
 
         if (!result.ok) {
@@ -791,10 +805,15 @@ function subjectKey(subject: PreviewSubject): string {
 }
 
 /** The request body for a subject. */
-function requestFor(subject: PreviewSubject): Record<string, string> {
+function requestFor(
+    subject: PreviewSubject,
+    environment: string | null,
+): Record<string, string> {
     switch (subject.kind) {
         case "object":
-            return { objectId: subject.objectId };
+            return environment === null
+                ? { objectId: subject.objectId }
+                : { objectId: subject.objectId, environment };
         case "model":
             return { modelReference: subject.modelReference };
         default:

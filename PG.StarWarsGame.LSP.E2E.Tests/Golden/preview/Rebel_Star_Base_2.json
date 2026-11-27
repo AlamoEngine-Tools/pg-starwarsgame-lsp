@@ -751,6 +751,8 @@
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
   "MaxSpeed": null,
+  "Environment": null,
+  "TerrainModels": [],
   "Behaviors": [
     "DUMMY_STAR_BASE",
     "SELECTABLE",

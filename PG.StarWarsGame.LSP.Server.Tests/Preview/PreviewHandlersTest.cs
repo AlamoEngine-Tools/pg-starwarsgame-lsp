@@ -74,6 +74,73 @@ public sealed class PreviewHandlersTest
         Assert.Equal(result.Scene.Animations, first.Animations);
     }
 
+    [Fact]
+    public async Task GetPreviewScene_AssemblesAUnitForTheEnvironmentAskedFor()
+    {
+        // #294: the environment the reader picks reaches the builder, and the model it maps to is the
+        // one the background build is asked for first.
+        var assets = new StubAssets()
+            .With("Data/Art/Models/trooper.alo", [1])
+            .With("Data/Art/Models/trooper_snow.alo", [1]);
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = ImmutableDictionary.CreateRange(StringComparer.OrdinalIgnoreCase,
+            [
+                KeyValuePair.Create("Trooper", ImmutableArray.Create(new GameSymbol("Trooper",
+                    GameSymbolKind.XmlObject, "GameObjectType", new FileOrigin("file:///Trooper.xml", 0, 0), null)))
+            ])
+        };
+        var tags = new FakeVariantTagSource().With("Trooper",
+            new VariantTag("Land_Model_Name", "trooper.alo", "<Land_Model_Name>trooper.alo</Land_Model_Name>", 0),
+            new VariantTag("Land_Terrain_Model_Mapping", "Arctic, trooper_snow.alo",
+                "<Land_Terrain_Model_Mapping>Arctic, trooper_snow.alo</Land_Terrain_Model_Mapping>", 0));
+        var builder = new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
+            tags, assets, ResxMessageCatalog.Server("en"));
+        var prioritised = new PrioritisedModels();
+        var handler = new GetPreviewSceneHandler(builder, assets, TestCatalogues.English, new NoWorkspaceIcons(),
+            prioritised);
+
+        var result = await handler.Handle(
+            new GetPreviewSceneParams { ObjectId = "Trooper", Environment = "Arctic" }, CancellationToken.None);
+
+        Assert.Equal("trooper_snow.alo", Assert.Single(result.Scene.Parts).ModelRef);
+        Assert.Equal("Arctic", result.Scene.Environment);
+        Assert.Equal("trooper_snow.alo", Assert.Single(Assert.Single(prioritised.Calls)).ModelReference);
+    }
+
+    [Fact]
+    public async Task GetPreviewScene_QueuesTheModelsOfTheOtherEnvironmentsLast()
+    {
+        // #294: a switch to another environment finds its model converted already. Last, because the reader
+        // may never pick one; once, because the hull is listed already; never a model that is not found.
+        var assets = new StubAssets()
+            .With("Data/Art/Models/trooper.alo", [1])
+            .With("Data/Art/Models/trooper_snow.alo", [1]);
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = ImmutableDictionary.CreateRange(StringComparer.OrdinalIgnoreCase,
+            [
+                KeyValuePair.Create("Trooper", ImmutableArray.Create(new GameSymbol("Trooper",
+                    GameSymbolKind.XmlObject, "GameObjectType", new FileOrigin("file:///Trooper.xml", 0, 0), null)))
+            ])
+        };
+        var tags = new FakeVariantTagSource().With("Trooper",
+            new VariantTag("Land_Model_Name", "trooper.alo", "<Land_Model_Name>trooper.alo</Land_Model_Name>", 0),
+            new VariantTag("Land_Terrain_Model_Mapping",
+                "Temperate, trooper.alo, Arctic, trooper_snow.alo, Desert, missing.alo",
+                "<Land_Terrain_Model_Mapping>...</Land_Terrain_Model_Mapping>", 0));
+        var builder = new PreviewSceneBuilder(new FakeGameIndexService(index), new SchemaProviderBuilder().Build(),
+            tags, assets, ResxMessageCatalog.Server("en"));
+        var prioritised = new PrioritisedModels();
+        var handler = new GetPreviewSceneHandler(builder, assets, TestCatalogues.English, new NoWorkspaceIcons(),
+            prioritised);
+
+        await handler.Handle(new GetPreviewSceneParams { ObjectId = "Trooper" }, CancellationToken.None);
+
+        Assert.Equal(["trooper.alo", "trooper_snow.alo"],
+            Assert.Single(prioritised.Calls).Select(item => item.ModelReference));
+    }
+
     /// <summary>The background build as a record of what a scene asked it to do first.</summary>
     private sealed class PrioritisedModels : IPreviewCacheBuilder
     {

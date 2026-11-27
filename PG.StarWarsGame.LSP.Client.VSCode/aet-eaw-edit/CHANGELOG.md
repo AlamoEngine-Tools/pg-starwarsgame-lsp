@@ -15,6 +15,12 @@
   every turned turret back at the pose the model authored, in every lens, with the number of turned turrets
   inside it; it is disabled while none is turned and left out for a subject with no turret that turns
   ([#438](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/438))
+- **A land unit on each map environment in the unit preview** - the Model state group on the stage carries a
+  map environment pill for a unit. Its list offers the default model and each environment the unit's
+  `Land_Terrain_Model_Mapping` names, with the model it gives; picking one assembles the unit on that model,
+  by the first pair for the environment. The pick resets when the preview opens. A unit that maps no
+  environment shows the pill disabled, with the reason
+  ([#294](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/294))
 - **Damage state and detail level as pills with a list** - the two sliders on the stage's bottom edge are
   pills: the glyph, the level and the mark of a list. The list's rows say what each level is - the health
   band a damage state covers, the meshes and triangles a detail level draws - and the pill's tooltip says it

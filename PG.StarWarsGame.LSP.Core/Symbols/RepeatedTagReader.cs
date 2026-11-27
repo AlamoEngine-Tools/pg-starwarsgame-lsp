@@ -9,10 +9,9 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 /// <remarks>
 ///     <para>
 ///         <see cref="EffectiveObjectResolver" /> cannot answer this. It accumulates into a dictionary
-///         keyed by tag name, and only the <c>variantMode: merge</c> plus <c>multipleAllowed</c>
-///         branch keeps an occurrence list - every other repeated tag collapses to the last one seen.
-///         Exactly one tag in the whole schema (<c>Death_Clone</c>) sets that mode, so in practice
-///         resolving GameConstants yields ONE <c>Damage_To_Armor_Mod</c> out of 2426.
+///         keyed by tag name, and keeps an occurrence list only for a <c>multipleAllowed</c> tag whose
+///         <c>variantMode</c> is <c>merge</c> or whose <c>repeatMode</c> is <c>add</c> - every other
+///         repeated tag collapses to the last one seen, or joins into one value.
 ///     </para>
 ///     <para>
 ///         That collapse is correct for variant merging and simply irrelevant to a singleton, which

@@ -379,6 +379,8 @@
   "ForceCloak": null,
   "DamagedSmokeAsset": null,
   "MaxSpeed": 1,
+  "Environment": null,
+  "TerrainModels": [],
   "Behaviors": [
     "SELECTABLE",
     "STUNNABLE",

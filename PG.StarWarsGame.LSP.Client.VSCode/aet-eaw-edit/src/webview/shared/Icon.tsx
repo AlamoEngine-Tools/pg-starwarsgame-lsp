@@ -216,6 +216,10 @@ const ICONS = {
     // side by side on a rendered panel, the damage slider read as a disabled control.
     damage: IconHeartBroken,
 
+    // A mountain for the map environment a land unit is shown on: here it IS scenery, which is
+    // why it was turned down for the ground plane.
+    mapEnvironment: IconMountain,
+
     // A tank, because its turret is the one shape that says turret: there is no glyph for a turret
     // alone, and a crosshair is already the targeting mark.
     turret: IconTank,

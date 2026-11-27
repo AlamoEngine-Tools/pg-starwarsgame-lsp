@@ -1,13 +1,16 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The damage state and detail level the subject is shown at, and the reset of its turrets, on the stage
-// bottom edge.
+// The damage state, detail level and map environment the subject is shown at, and the reset of its
+// turrets, on the stage bottom edge.
 
 import type { Dispatch, SetStateAction, RefObject } from "react";
 import type { CombatLens } from "../useCombatLens";
 import * as l10n from "@vscode/l10n";
-import { type PreviewScene } from "../../../protocol/modelPreview";
+import {
+    PREVIEW_SCENE_KIND,
+    type PreviewScene,
+} from "../../../protocol/modelPreview";
 import { IconButton } from "../../shared/Button";
 import { Icon } from "../../shared/Icon";
 import { PillSelect } from "../../shared/PillSelect";
@@ -29,6 +32,8 @@ export interface SubjectStateControlsProps {
     /** How many of them the reader has turned off their rest. */
     turnedTurrets: number;
     onResetTurrets: () => void;
+    /** Asks for the scene on another map environment; null is the unit's default model. */
+    onPickEnvironment: (environment: string | null) => void;
 }
 
 export function SubjectStateControls({
@@ -44,8 +49,16 @@ export function SubjectStateControls({
     turretCount,
     turnedTurrets,
     onResetTurrets,
+    onPickEnvironment,
 }: SubjectStateControlsProps): React.JSX.Element {
     const damageTable = scene?.damageTable ?? [];
+    // A unit's, never a bare model's: only an object has a Land_Terrain_Model_Mapping to read.
+    const isUnit = scene?.kind === PREVIEW_SCENE_KIND.object;
+    const terrainModels = scene?.terrainModels ?? [];
+    const environment = scene?.environment ?? null;
+    const environmentModel = terrainModels.find(
+        (terrain) => terrain.environment === environment,
+    )?.model;
 
     return (
         <>
@@ -68,6 +81,7 @@ export function SubjectStateControls({
                             level draws - is in the list's rows and in the tooltip. */}
             {(levels.alt.length > 1 ||
                 levels.lod.length > 1 ||
+                isUnit ||
                 turretCount > 0) && (
                 <div
                     className="stage-chrome subject-state"
@@ -121,6 +135,40 @@ export function SubjectStateControls({
                                 lodPickedRef.current = true;
                                 setLod(level);
                             }}
+                        />
+                    )}
+
+                    {/* The land model the unit wears on a map of one environment (#294). The server
+                        assembles the scene for it, so a pick asks for the scene again. Disabled rather
+                        than left out on a unit that maps none, so the reader sees the choice exists. */}
+                    {isUnit && (
+                        <PillSelect
+                            icon="mapEnvironment"
+                            className="environment"
+                            value={environment ?? ""}
+                            shown={environment ?? l10n.t("Default")}
+                            options={[
+                                { value: "", label: l10n.t("Default model") },
+                                ...terrainModels.map((terrain) => ({
+                                    value: terrain.environment,
+                                    label: `${terrain.environment} - ${terrain.model}`,
+                                })),
+                            ]}
+                            title={
+                                environment === null
+                                    ? l10n.t("Map environment - default model")
+                                    : l10n.t(
+                                          "Map environment {0}",
+                                          `${environment} - ${environmentModel ?? ""}`,
+                                      )
+                            }
+                            disabled={terrainModels.length === 0}
+                            disabledReason={l10n.t(
+                                "No Land_Terrain_Model_Mapping",
+                            )}
+                            onPick={(picked) =>
+                                onPickEnvironment(picked === "" ? null : picked)
+                            }
                         />
                     )}
 
