@@ -6402,11 +6402,12 @@ const Shell = styled.div`
         display: none;
     }
 
-    /* Trace: the problems bar's frame, with a filter row pinned under the title. */
+    /* Trace: the problems bar's frame, its search plate on the lower right corner. The frame does
+       not scroll - only its row list does - so the plate stays on the corner while the rows move. */
 
     .sim-trace {
         position: relative;
-        overflow-y: auto;
+        overflow: hidden;
         border-top: var(--space-1) solid var(--colour-line);
         background: var(--colour-sidebar);
         flex-shrink: 0;
@@ -6414,20 +6415,10 @@ const Shell = styled.div`
         padding: 0 var(--space-4) var(--space-2);
     }
 
-    .sim-trace-tools {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        display: flex;
-        gap: var(--space-4);
-        align-items: center;
-        padding: var(--space-2) 0;
-        background: var(--colour-sidebar);
-    }
+    /* Room past the last row, so it can be scrolled out from under the plate. */
 
-    .sim-trace-tools input {
-        flex: 1;
-        min-width: 0;
+    .sim-trace .problem-list {
+        padding-bottom: calc(var(--space-24) + var(--space-16));
     }
 
     .sim-trace-row {

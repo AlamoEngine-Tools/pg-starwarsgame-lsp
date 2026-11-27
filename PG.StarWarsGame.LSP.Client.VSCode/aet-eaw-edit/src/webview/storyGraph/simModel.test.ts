@@ -299,6 +299,45 @@ describe("trace rows", () => {
         assert.equal(filterTrace(rows, "   ").length, 3);
     });
 
+    /**
+     * The trace's search is the search plate, with its three ways of reading a pattern. Wildcards
+     * and regular expressions read a row as one line - its tick first, as `t1`, then what the row
+     * says - so a pattern can ask for a tick as well as for a name.
+     */
+    it("reads the pattern with wildcards or as a regular expression in those modes", () => {
+        const rows = traceRows(steps, labelOf);
+        assert.deepEqual(
+            filterTrace(rows, "be?a", "wildcard").map((r) => r.seq),
+            [1, 2],
+        );
+        assert.deepEqual(
+            filterTrace(rows, "^t1 ", "regex").map((r) => r.seq),
+            [1, 2],
+        );
+        assert.deepEqual(
+            filterTrace(rows, "(", "regex").map((r) => r.seq),
+            [],
+        );
+        // Plain text takes the same characters literally.
+        assert.deepEqual(
+            filterTrace(rows, "be?a", "text").map((r) => r.seq),
+            [],
+        );
+    });
+
+    /** `t12` asks for a tick in plain text only; elsewhere it is a pattern like any other. */
+    it("keeps the tick shorthand to plain text", () => {
+        const rows = traceRows(steps, labelOf);
+        assert.deepEqual(
+            filterTrace(rows, "t1", "wildcard").map((r) => r.seq),
+            filterTrace(rows, "t1*", "wildcard").map((r) => r.seq),
+        );
+        assert.deepEqual(
+            filterTrace(rows, "t1").map((r) => r.seq),
+            [1, 2],
+        );
+    });
+
     it("falls back to the id tail for an unknown node", () => {
         assert.equal(
             labelFor("file:///t.xml#some_event", () => undefined),

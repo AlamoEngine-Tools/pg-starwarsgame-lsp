@@ -137,6 +137,11 @@
   zoom in percent under them, which follows the wheel and zooms about the middle of the view. The
   encyclopedia card's zoom is the same slider, its size in percent where it read `Zoom 3.00x`
   ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
+- **The simulation trace's search on the plate** - the story simulation's trace is searched from the
+  same plate, on the trace panel's lower right corner, and its copy button stands in the panel's bar.
+  Plain text keeps the tick shorthand, `t12` for tick 12; wildcards and regular expressions read a row
+  with its tick first, so `^t12 ` asks for that tick
+  ([#222](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/222))
 
 ### Fixes
 

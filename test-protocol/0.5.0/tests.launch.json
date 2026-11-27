@@ -786,5 +786,11 @@
   },
   "PRV-83": {
     "open": "{repo}\\eaw"
+  },
+  "STY-12": {
+    "open": "{repo}\\eaw",
+    "settings": {
+      "aet-eaw-edit.experimental.storySimulator": true
+    }
   }
 }
